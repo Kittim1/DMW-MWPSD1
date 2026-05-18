@@ -1,0 +1,8 @@
+node_modules/
+.env
+.env.backup
+vendor/
+bootstrap/cache/
+storage/
+*.log
+.DS_Store

@@ -1,0 +1,127 @@
+.counter-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.current-ticket-section,
+.next-tickets-section {
+  background: white;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.current-ticket-section h3,
+.next-tickets-section h3 {
+  color: #333;
+  margin-bottom: 20px;
+  font-size: 18px;
+}
+
+.ticket-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.ticket-number {
+  font-size: 72px;
+  font-weight: 900;
+  color: #28a745;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  line-height: 1;
+  padding: 20px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: 12px;
+  width: 100%;
+  text-align: center;
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ticket-actions {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+}
+
+.no-ticket {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+  font-size: 16px;
+}
+
+.next-tickets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.next-ticket-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 4px solid #667eea;
+}
+
+.ticket-position {
+  font-weight: 600;
+  color: #667eea;
+  min-width: 40px;
+}
+
+.next-ticket-item .ticket-number {
+  font-size: 24px;
+  color: #333;
+  flex: 1;
+  padding: 0;
+  background: transparent;
+  text-shadow: none;
+  min-height: auto;
+}
+
+.empty-next-tickets {
+  text-align: center;
+  padding: 40px 20px;
+  color: #ccc;
+}
+
+.panel-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 15px;
+}
+
+.btn-large {
+  flex: 1;
+  padding: 20px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .counter-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-actions {
+    grid-column: auto;
+  }
+
+  .ticket-number {
+    font-size: 48px;
+    min-height: 120px;
+  }
+}

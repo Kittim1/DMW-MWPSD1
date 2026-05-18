@@ -1,52 +1,133 @@
-# Welcome to your Expo app 👋
+# DMW Processing - Queue Management System
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A complete queue management system for Department of Migrant Workers processing centers, built with React.js frontend, Laravel PHP backend, and MySQL database.
 
-## Get started
+## 🚀 Quick Start
 
-1. Install dependencies
+This workspace contains THREE separate projects:
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+dmwprocessing/
+├── frontend/          # React.js application (Port 3000)
+├── backend/           # Laravel PHP API (Port 8000)
+├── app/               # (Original Expo React Native app)
+├── SETUP.md          # Complete setup instructions
+└── README.md
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### Quick Setup (3 Steps)
 
-### Other setup steps
+**Terminal 1 - Backend:**
+```bash
+cd backend
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan jwt:secret
+php artisan migrate:fresh --seed
+php artisan serve
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+**Terminal 2 - Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-## Learn more
+**Access the app:**
+- Landing Page: http://localhost:3000/landing
+- Login: http://localhost:3000/login
+- Admin Credentials: admin@dmw.com / password
 
-To learn more about developing your project with Expo, look at the following resources:
+## 📋 Features
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### Landing Page
+- Real-time queue display (updates every 2 seconds)
+- Shows waiting customers and currently serving
+- Matches the DMW design requirement
+- Display on public TVs
+
+### Admin Dashboard
+- View all counters and statistics
+- Monitor system status
+
+### Counter Panel
+- Call next ticket
+- Mark service as completed
+- View queue preview
+
+### Demo Credentials
+- **Admin**: admin@dmw.com / password
+- **Counter 1-5**: counter1@dmw.com ... counter5@dmw.com / password
+
+## 🛠 Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React.js 18 + TypeScript + Vite |
+| Backend | Laravel 11 + PHP 8.2 |
+| Database | MySQL |
+| API | REST + JWT Auth |
+
+## 📖 Full Documentation
+
+See [SETUP.md](SETUP.md) for:
+- Detailed installation steps
+- Database configuration
+- Troubleshooting guide
+- Development workflow
+
+## 🎯 Project Structure
+
+```
+backend/
+├── app/Models/ → User, Counter, Ticket
+├── app/Http/Controllers/Api/ → AuthController, QueueController, CounterController
+├── database/migrations/ → Database schema
+├── routes/api.php → API endpoints
+└── .env → Configuration
+
+frontend/
+├── src/pages/ → Login, Landing, Dashboard
+├── src/components/ → QueueDisplay, CounterPanel, ProtectedRoute
+├── src/services/api.ts → API client
+└── vite.config.ts → Build configuration
+```
+
+## 🔌 API Endpoints
+
+**Authentication:**
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/user`
+
+**Queue:**
+- `GET /api/queue/waiting` - All waiting tickets
+- `GET /api/queue/serving` - Serving tickets
+- `POST /api/queue/call-next/{counterId}` - Call next ticket
+- `POST /api/queue/complete/{ticketId}` - Complete service
+
+**Counters:**
+- `GET /api/counters` - Get all counters
+- `PUT /api/counters/{id}` - Update counter
+
+## 🚢 Deployment
+
+See README section in SETUP.md for production deployment instructions.
+
+## 📝 Database Schema
+
+**Users** - Store admin and counter operators
+**Counters** - 5 service counters (1-5)
+**Tickets** - Queue tickets with status: waiting → serving → completed
+
+## ❓ Need Help?
+
+1. Check [SETUP.md](SETUP.md) for detailed instructions
+2. Ensure both frontend and backend are running
+3. Verify database is created and migrations ran
+4. Check .env files have correct configuration
 
 ## Join the community
 
