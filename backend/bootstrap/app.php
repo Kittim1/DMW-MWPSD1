@@ -12,6 +12,12 @@ $app = Application::configure(dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->api();
         $middleware->statefulApi();
+        
+        $middleware->validateCsrfTokens(
+            except: [
+                'api/*',
+            ]
+        );
     })
     ->withProviders([
         \App\Providers\AppServiceProvider::class,
@@ -20,5 +26,17 @@ $app = Application::configure(dirname(__DIR__))
         //
     })
     ->create();
+
+// Ensure console kernel is bound
+$app->singleton(
+    \Illuminate\Console\Kernel::class,
+    \App\Console\Kernel::class
+);
+
+// Ensure HTTP kernel is bound
+$app->singleton(
+    \Illuminate\Contracts\Http\Kernel::class,
+    \App\Http\Kernel::class
+);
 
 return $app;

@@ -1,124 +1,198 @@
-import { useState, useEffect } from 'react';
-import { queueService } from '../services/api';
-import './CounterPanel.css';
+import { useEffect, useState } from "react";
+import { counterService, queueService } from "../services/api";
+import "./CounterPanel.css";
 
 interface CounterPanelProps {
   userId: number;
+  counterName?: string;
 }
 
 interface QueueItem {
+  id: number;
   ticket_id: number;
   priority_number: string;
   status: string;
+  counter_id?: number;
 }
 
 function CounterPanel({ userId }: CounterPanelProps) {
-  const [currentTicket, setCurrentTicket] = useState<QueueItem | null>(null);
-  const [nextTickets, setNextTickets] = useState<QueueItem[]>([]);
+  const [servingTickets, setServingTickets] = useState<QueueItem[]>([]);
+  const [waitingTickets, setWaitingTickets] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [counterId, setCounterId] = useState<number | null>(null);
+
+  // Fetch counter ID on mount
+  useEffect(() => {
+    const fetchCounterId = async () => {
+      try {
+        const countersRes = await counterService.getCounters();
+        const counters = countersRes.data || [];
+        // Find the counter assigned to this user
+        const userCounter = counters.find((c: any) => c.user_id === userId);
+        if (userCounter) {
+          setCounterId(userCounter.id);
+        } else {
+          // Fallback: use first counter or userId
+          setCounterId(userId);
+        }
+      } catch (error) {
+        console.error("Failed to fetch counter:", error);
+        setCounterId(userId); // fallback
+      }
+    };
+
+    fetchCounterId();
+  }, [userId]);
 
   const fetchQueue = async () => {
     try {
-      const res = await queueService.getWaiting();
-      const tickets = res.data;
-      
-      if (tickets.length > 0) {
-        setCurrentTicket(tickets[0]);
-        setNextTickets(tickets.slice(1, 4));
-      } else {
-        setCurrentTicket(null);
-        setNextTickets([]);
-      }
+      const servingRes = await queueService.getServing();
+      const waitingRes = await queueService.getWaiting();
+      setServingTickets(servingRes.data || []);
+      setWaitingTickets(waitingRes.data || []);
     } catch (error) {
-      console.error('Failed to fetch queue:', error);
+      console.error("Failed to fetch queue:", error);
     }
   };
 
   useEffect(() => {
+    if (!counterId) return;
     fetchQueue();
     const interval = setInterval(fetchQueue, 2000);
     return () => clearInterval(interval);
-  }, []);
+  }, [counterId]);
+
+  // Find the ticket currently being served by THIS counter
+  const currentlyServingTicket = servingTickets.find(
+    (t) => t.counter_id === counterId,
+  );
+
+  // Flag: is this counter currently serving someone?
+  const isServing = !!currentlyServingTicket;
 
   const handleCallNext = async () => {
-    if (!currentTicket) return;
-    
+    if (!counterId) return;
     setLoading(true);
     try {
-      await queueService.callNext(userId);
+      await queueService.callNext(counterId);
       await fetchQueue();
     } catch (error) {
-      console.error('Failed to call next:', error);
+      console.error("Failed to call next:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleComplete = async () => {
-    if (!currentTicket) return;
-    
+  const handleMarkCompleted = async () => {
+    if (!currentlyServingTicket) return;
+
     setLoading(true);
     try {
-      await queueService.completeService(currentTicket.ticket_id);
+      await queueService.completeService(currentlyServingTicket.ticket_id);
       await fetchQueue();
     } catch (error) {
-      console.error('Failed to complete:', error);
+      console.error("Failed to mark complete:", error);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="counter-panel">
-      <div className="current-ticket-section">
-        <h3>Now Serving</h3>
-        {currentTicket ? (
-          <div className="ticket-display">
-            <div className="ticket-number">{currentTicket.priority_number}</div>
-            <div className="ticket-actions">
+    <div className="counter-dashboard">
+      {/* ── Current Catered Numbers (All Counters) ── */}
+      <section className="panel-card">
+        <h2 className="panel-title">CURRENT CATERED NUMBERS</h2>
+        <div className="catered-numbers-box">
+          {servingTickets.length > 0 ? (
+            <div className="tickets-grid">
+              {servingTickets.map((ticket) => (
+                <div key={ticket.id} className="ticket-pair">
+                  <div className="ticket-number">{ticket.priority_number}</div>
+                  <div className="counter-assignment">
+                    COUNTER {ticket.counter_id || "-"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">No tickets being catered</div>
+          )}
+        </div>
+      </section>
+
+      {/* ── You Are Serving (This Counter) ── */}
+      {currentlyServingTicket && (
+        <section className="panel-card you-are-serving-card">
+          <h2 className="panel-title">YOU ARE SERVING</h2>
+          <div className="serving-ticket-box">
+            <div className="serving-ticket-display">
+              <div className="serving-ticket-number">
+                {currentlyServingTicket.priority_number}
+              </div>
               <button
-                onClick={handleComplete}
+                onClick={handleMarkCompleted}
                 disabled={loading}
-                className="btn btn-success"
+                className="mark-completed-button"
               >
-                Complete Service
+                {loading ? "Processing..." : "MARK AS COMPLETED"}
               </button>
             </div>
           </div>
-        ) : (
-          <div className="no-ticket">
-            <p>No tickets in queue</p>
-          </div>
-        )}
-      </div>
+        </section>
+      )}
 
-      <div className="next-tickets-section">
-        <h3>Next in Queue</h3>
-        <div className="next-tickets-list">
-          {nextTickets.length > 0 ? (
-            nextTickets.map((ticket, index) => (
-              <div key={ticket.ticket_id} className="next-ticket-item">
-                <span className="ticket-position">#{index + 1}</span>
-                <span className="ticket-number">{ticket.priority_number}</span>
-              </div>
-            ))
-          ) : (
-            <div className="empty-next-tickets">
-              <p>No more tickets waiting</p>
+      {/* ── Dashboard ── */}
+      <section className="panel-card">
+        <h2 className="panel-title">Dashboard</h2>
+
+        <div className="dashboard-body">
+          {/* Left: Not Catered Numbers */}
+          <div className="not-catered-column">
+            <h3 className="column-title">NOT CATERED NUMBERS:</h3>
+            <div className="not-catered-list">
+              {waitingTickets.length > 0 ? (
+                waitingTickets.map((ticket) => (
+                  <div key={ticket.id} className="waiting-ticket">
+                    {ticket.priority_number}
+                  </div>
+                ))
+              ) : (
+                <div className="empty-waiting">No waiting tickets</div>
+              )}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
 
-      <div className="panel-actions">
-        <button
-          onClick={handleCallNext}
-          disabled={loading || !currentTicket}
-          className="btn btn-primary btn-large"
-        >
-          {loading ? 'Processing...' : 'Call Next Ticket'}
-        </button>
-      </div>
+          {/* Right: Actions */}
+          <div className="actions-column">
+            <h3 className="column-title">ACTIONS</h3>
+            <div className="actions-list">
+              {!isServing && waitingTickets.length > 0 ? (
+                waitingTickets.map((ticket) => (
+                  <button
+                    key={ticket.id}
+                    onClick={handleCallNext}
+                    disabled={loading || isServing}
+                    className="cater-button"
+                    title={
+                      isServing
+                        ? "Complete current ticket first"
+                        : "Call next ticket"
+                    }
+                  >
+                    CATER
+                  </button>
+                ))
+              ) : isServing ? (
+                <div className="serving-message">
+                  Serving ticket {currentlyServingTicket?.priority_number}
+                </div>
+              ) : (
+                <div className="empty-waiting">—</div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

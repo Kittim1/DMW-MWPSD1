@@ -6,13 +6,59 @@ use App\Http\Controllers\Controller;
 use App\Models\Ticket;
 use App\Models\Counter;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class QueueController extends Controller
 {
+    private function getCurrentSessionType()
+    {
+        $hour = now()->hour;
+        return $hour < 12 ? 'morning' : 'afternoon';
+    }
+
+    private function getCurrentSessionDate()
+    {
+        return now()->format('Y-m-d');
+    }
+
+    private function initializeSessionTickets()
+    {
+        $sessionDate = $this->getCurrentSessionDate();
+        $sessionType = $this->getCurrentSessionType();
+
+        // Check if tickets already exist for this session
+        $existingTickets = Ticket::where('session_date', $sessionDate)
+            ->where('session_type', $sessionType)
+            ->count();
+
+        if ($existingTickets > 0) {
+            return; // Tickets already initialized
+        }
+
+        // Generate tickets 01-50 for both morning and afternoon sessions
+        for ($i = 1; $i <= 50; $i++) {
+            Ticket::create([
+                'priority_number' => str_pad($i, 2, '0', STR_PAD_LEFT),
+                'session_date' => $sessionDate,
+                'session_type' => $sessionType,
+                'status' => Ticket::STATUS_WAITING,
+            ]);
+        }
+    }
+
     public function getWaiting()
     {
-        $tickets = Ticket::where('status', Ticket::STATUS_WAITING)
-            ->orWhere('status', Ticket::STATUS_SERVING)
+        $this->initializeSessionTickets();
+
+        $sessionDate = $this->getCurrentSessionDate();
+        $sessionType = $this->getCurrentSessionType();
+
+        $tickets = Ticket::where('session_date', $sessionDate)
+            ->where('session_type', $sessionType)
+            ->where(function ($query) {
+                $query->where('status', Ticket::STATUS_WAITING)
+                    ->orWhere('status', Ticket::STATUS_SERVING);
+            })
             ->orderBy('created_at', 'asc')
             ->get(['id as ticket_id', 'priority_number', 'counter_id', 'status']);
 
@@ -21,7 +67,14 @@ class QueueController extends Controller
 
     public function getServing()
     {
-        $tickets = Ticket::where('status', Ticket::STATUS_SERVING)
+        $this->initializeSessionTickets();
+
+        $sessionDate = $this->getCurrentSessionDate();
+        $sessionType = $this->getCurrentSessionType();
+
+        $tickets = Ticket::where('session_date', $sessionDate)
+            ->where('session_type', $sessionType)
+            ->where('status', Ticket::STATUS_SERVING)
             ->orderBy('called_at', 'asc')
             ->get(['id as ticket_id', 'priority_number', 'counter_id', 'status']);
 
@@ -30,9 +83,16 @@ class QueueController extends Controller
 
     public function callNext($counterId)
     {
+        $this->initializeSessionTickets();
+
         $counter = Counter::findOrFail($counterId);
 
-        $nextTicket = Ticket::where('status', Ticket::STATUS_WAITING)
+        $sessionDate = $this->getCurrentSessionDate();
+        $sessionType = $this->getCurrentSessionType();
+
+        $nextTicket = Ticket::where('session_date', $sessionDate)
+            ->where('session_type', $sessionType)
+            ->where('status', Ticket::STATUS_WAITING)
             ->orderBy('created_at', 'asc')
             ->first();
 
@@ -81,9 +141,12 @@ class QueueController extends Controller
 
         $ticket = Ticket::create([
             'priority_number' => $validated['priority_number'],
+            'session_date' => $this->getCurrentSessionDate(),
+            'session_type' => $this->getCurrentSessionType(),
             'status' => Ticket::STATUS_WAITING,
         ]);
 
         return response()->json($ticket, 201);
     }
 }
+

@@ -1,10 +1,10 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
-import Login from './pages/Login';
-import Landing from './pages/Landing';
-import Dashboard from './pages/Dashboard';
-import ProtectedRoute from './components/ProtectedRoute';
+import { useEffect, useState } from 'react';
+import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import './App.css';
+import ProtectedRoute from './components/ProtectedRoute';
+import Dashboard from './pages/Dashboard';
+import Landing from './pages/Landing';
+import Login from './pages/Login';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(

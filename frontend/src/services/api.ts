@@ -18,6 +18,20 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+// Redirect to login on 401 Unauthorized responses
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error && error.response && error.response.status === 401) {
+      // remove invalid token and redirect to login page
+      localStorage.removeItem('auth_token');
+      // set full path so Vite/React Router handles it correctly
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const authService = {
   login: (email: string, password: string) =>
     apiClient.post('/auth/login', { email, password }),

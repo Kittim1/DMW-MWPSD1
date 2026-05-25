@@ -1,13 +1,18 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { authService, queueService, counterService } from '../services/api';
-import CounterPanel from '../components/CounterPanel';
-import './Dashboard.css';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import CounterPanel from "../components/CounterPanel";
+import { authService, counterService } from "../services/api";
+import "./Dashboard.css";
 
 interface Counter {
   id: number;
   counter_name: string;
-  current_ticket?: string;
+  current_ticket_id?: number | null;
+  currentTicket?: {
+    id: number;
+    priority_number: string;
+    status: string;
+  } | null;
 }
 
 interface User {
@@ -26,7 +31,7 @@ function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const userData = localStorage.getItem('user');
+        const userData = localStorage.getItem("user");
         if (userData) {
           setUser(JSON.parse(userData));
         }
@@ -34,9 +39,9 @@ function Dashboard() {
         const countersRes = await counterService.getCounters();
         setCounters(countersRes.data);
       } catch (error) {
-        console.error('Failed to fetch data:', error);
-        localStorage.removeItem('auth_token');
-        navigate('/login');
+        console.error("Failed to fetch data:", error);
+        localStorage.removeItem("auth_token");
+        navigate("/login");
       } finally {
         setLoading(false);
       }
@@ -49,11 +54,11 @@ function Dashboard() {
     try {
       await authService.logout();
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
     } finally {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user');
-      navigate('/login');
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("user");
+      navigate("/login");
     }
   };
 
@@ -67,7 +72,9 @@ function Dashboard() {
         <div className="header-content">
           <h1>Queue Management Dashboard</h1>
           <div className="user-info">
-            <span>Welcome, {user?.name} ({user?.role})</span>
+            <span>
+              Welcome, {user?.name} ({user?.role})
+            </span>
             <button onClick={handleLogout} className="btn btn-danger">
               Logout
             </button>
@@ -76,7 +83,7 @@ function Dashboard() {
       </header>
 
       <main className="dashboard-main">
-        {user?.role === 'superadmin' ? (
+        {user?.role === "superadmin" ? (
           <div className="admin-dashboard">
             <h2>System Administration</h2>
             <div className="admin-stats">
@@ -87,7 +94,7 @@ function Dashboard() {
               <div className="stat-card">
                 <h3>Active Counters</h3>
                 <p className="stat-value">
-                  {counters.filter((c) => c.current_ticket).length}
+                  {counters.filter((c) => c.current_ticket_id).length}
                 </p>
               </div>
             </div>
@@ -98,14 +105,16 @@ function Dashboard() {
                 <div key={counter.id} className="counter-info-card">
                   <h4>{counter.counter_name}</h4>
                   <p>
-                    Current Ticket:{' '}
-                    <strong>{counter.current_ticket || 'None'}</strong>
+                    Current Ticket:{" "}
+                    <strong>
+                      {counter.currentTicket?.priority_number || "None"}
+                    </strong>
                   </p>
                 </div>
               ))}
             </div>
           </div>
-        ) : user?.role === 'counter' ? (
+        ) : user?.role === "counter" ? (
           <div className="counter-dashboard">
             <h2>Counter Service Panel</h2>
             <CounterPanel userId={user.id} />

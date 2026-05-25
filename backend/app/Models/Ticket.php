@@ -13,6 +13,8 @@ class Ticket extends Model
 
     protected $fillable = [
         'priority_number',
+        'session_date',
+        'session_type',
         'counter_id',
         'status',
         'called_at',

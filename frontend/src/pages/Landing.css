@@ -7,20 +7,48 @@
 .landing-header {
   background: linear-gradient(135deg, #fafafa 0%, #f5f3f7 100%);
   color: rgb(8, 8, 8);
-  padding: 30px 20px;
+  padding: 20px;
   text-align: center;
   margin-bottom: 40px;
   border-radius: 8px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  gap: 30px;
+  margin-bottom: 10px;
+}
+
+.dmw-logo {
+  height: 80px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  flex-shrink: 0;
 }
 
 .landing-header h1 {
   font-size: 36px;
-  margin-bottom: 10px;
+  margin: 0;
+  flex: 1;
+}
+
+.landing-header h2 {
+  margin: 10px 0 5px 0;
+  font-size: 20px;
 }
 
 .landing-header p {
   font-size: 16px;
   opacity: 0.9;
+  margin: 5px 0;
 }
 
 .queue-display-container {
@@ -50,11 +78,6 @@
   }
 }
 .login-icon-btn {
-  position: absolute;
-  top: 4rem;
-  right: 1rem;
-  transform: translateY(-50%);
-
   display: flex;
   align-items: center;
   justify-content: center;
@@ -66,6 +89,9 @@
   border-radius: 50%;
   color: black;
   transition: background-color 0.2s ease, opacity 0.2s ease;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
 }
 
 .login-icon-btn:hover {

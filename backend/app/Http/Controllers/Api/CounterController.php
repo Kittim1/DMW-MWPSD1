@@ -10,7 +10,7 @@ class CounterController extends Controller
 {
     public function getCounters()
     {
-        $counters = Counter::with('user')
+        $counters = Counter::with('user', 'currentTicket')
             ->get(['id', 'counter_name', 'user_id', 'is_active', 'current_ticket_id']);
 
         return response()->json($counters);
