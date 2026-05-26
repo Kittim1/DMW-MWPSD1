@@ -55,10 +55,7 @@ class QueueController extends Controller
 
         $tickets = Ticket::where('session_date', $sessionDate)
             ->where('session_type', $sessionType)
-            ->where(function ($query) {
-                $query->where('status', Ticket::STATUS_WAITING)
-                    ->orWhere('status', Ticket::STATUS_SERVING);
-            })
+            ->where('status', Ticket::STATUS_WAITING)
             ->orderBy('created_at', 'asc')
             ->get(['id as ticket_id', 'priority_number', 'counter_id', 'status']);
 
