@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Ticket;
 use App\Models\Counter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 class QueueController extends Controller
@@ -25,6 +26,13 @@ class QueueController extends Controller
     {
         $sessionDate = $this->getCurrentSessionDate();
         $sessionType = $this->getCurrentSessionType();
+        
+        // Use cache to prevent repeated database checks
+        $cacheKey = "tickets_initialized_{$sessionDate}_{$sessionType}";
+        
+        if (Cache::has($cacheKey)) {
+            return; // Already initialized in this session
+        }
 
         // Check if tickets already exist for this session
         $existingTickets = Ticket::where('session_date', $sessionDate)
@@ -32,18 +40,29 @@ class QueueController extends Controller
             ->count();
 
         if ($existingTickets > 0) {
-            return; // Tickets already initialized
+            // Set cache for 24 hours so we don't check again
+            Cache::put($cacheKey, true, 86400);
+            return;
         }
 
-        // Generate tickets 01-50 for both morning and afternoon sessions
+        // Bulk insert tickets 01-50 for both morning and afternoon sessions (MUCH FASTER)
+        $ticketsToInsert = [];
         for ($i = 1; $i <= 50; $i++) {
-            Ticket::create([
+            $ticketsToInsert[] = [
                 'priority_number' => str_pad($i, 2, '0', STR_PAD_LEFT),
                 'session_date' => $sessionDate,
                 'session_type' => $sessionType,
                 'status' => Ticket::STATUS_WAITING,
-            ]);
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
         }
+        
+        // Insert all 50 at once (1 query instead of 50)
+        Ticket::insert($ticketsToInsert);
+        
+        // Set cache so we don't check again
+        Cache::put($cacheKey, true, 86400);
     }
 
     public function getWaiting()
@@ -76,6 +95,31 @@ class QueueController extends Controller
             ->get(['id as ticket_id', 'priority_number', 'counter_id', 'status']);
 
         return response()->json($tickets);
+    }
+
+    public function getStatus()
+    {
+        $this->initializeSessionTickets();
+
+        $sessionDate = $this->getCurrentSessionDate();
+        $sessionType = $this->getCurrentSessionType();
+
+        $serving = Ticket::where('session_date', $sessionDate)
+            ->where('session_type', $sessionType)
+            ->where('status', Ticket::STATUS_SERVING)
+            ->orderBy('called_at', 'asc')
+            ->get(['id as ticket_id', 'priority_number', 'counter_id', 'status']);
+
+        $waiting = Ticket::where('session_date', $sessionDate)
+            ->where('session_type', $sessionType)
+            ->where('status', Ticket::STATUS_WAITING)
+            ->orderBy('created_at', 'asc')
+            ->get(['id as ticket_id', 'priority_number', 'counter_id', 'status']);
+
+        return response()->json([
+            'serving' => $serving,
+            'waiting' => $waiting
+        ]);
     }
 
     public function callNext($counterId)

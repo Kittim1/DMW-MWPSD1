@@ -40,6 +40,7 @@ export const authService = {
 };
 
 export const queueService = {
+  getStatus: () => apiClient.get('/queue/status'),
   getWaiting: () => apiClient.get('/queue/waiting'),
   getServing: () => apiClient.get('/queue/serving'),
   callNext: (counterId: number) => apiClient.post(`/queue/call-next/${counterId}`),

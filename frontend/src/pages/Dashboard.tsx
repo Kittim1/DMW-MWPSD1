@@ -1,18 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import CounterPanel from "../components/CounterPanel";
-import { authService, counterService } from "../services/api";
+import { toast } from "react-toastify";
+import Analytics from "../components/Analytics";
+import { authService, queueService } from "../services/api";
 import "./Dashboard.css";
 
-interface Counter {
-  id: number;
-  counter_name: string;
-  current_ticket_id?: number | null;
-  currentTicket?: {
-    id: number;
-    priority_number: string;
-    status: string;
-  } | null;
+interface QueueItem {
+  ticket_id: number;
+  priority_number: string;
+  counter_id: number;
+  status: string;
 }
 
 interface User {
@@ -20,37 +17,87 @@ interface User {
   name: string;
   email: string;
   role: string;
+  counter_id?: number;
 }
 
 function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
-  const [counters, setCounters] = useState<Counter[]>([]);
+  const [servingQueue, setServingQueue] = useState<QueueItem[]>([]);
+  const [waitingQueue, setWaitingQueue] = useState<QueueItem[]>([]);
+  const [currentTicket, setCurrentTicket] = useState<QueueItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const userData = localStorage.getItem("user");
-        if (userData) {
-          setUser(JSON.parse(userData));
-        }
+    let timeoutId: NodeJS.Timeout;
+    let isMounted = true;
 
-        const countersRes = await counterService.getCounters();
-        setCounters(countersRes.data);
+    const fetchData = async () => {
+      console.log("fetchData function called");
+      const startTime = performance.now();
+      try {
+        const userLoadStart = performance.now();
+        const userData = localStorage.getItem("user");
+        const userLoadTime = performance.now() - userLoadStart;
+
+        let parsedUser = null;
+        if (userData) {
+          parsedUser = JSON.parse(userData);
+          // Only update user state if it's not set yet
+          setUser((prev) => prev || parsedUser);
+        }
+        console.log(`User load time: ${userLoadTime.toFixed(2)}ms`);
+
+        const apiStart = performance.now();
+        const response = await queueService.getStatus();
+        const { serving, waiting } = response.data;
+        const apiTime = performance.now() - apiStart;
+        console.log(`API fetch time: ${apiTime.toFixed(2)}ms`);
+
+        if (!isMounted) return;
+
+        const stateStart = performance.now();
+        setServingQueue(serving);
+        setWaitingQueue(waiting);
+
+        // Find current ticket for this counter if counter user
+        if (parsedUser?.counter_id) {
+          const ticket = serving.find(
+            (item: QueueItem) => item.counter_id === parsedUser.counter_id,
+          );
+          setCurrentTicket(ticket || null);
+        }
+        const stateTime = performance.now() - stateStart;
+        console.log(`State update time: ${stateTime.toFixed(2)}ms`);
+
+        const totalTime = performance.now() - startTime;
+        console.log(`✓ Total fetchData time: ${totalTime.toFixed(2)}ms`);
       } catch (error) {
         console.error("Failed to fetch data:", error);
-        localStorage.removeItem("auth_token");
-        navigate("/login");
+        if (isMounted) {
+          localStorage.removeItem("auth_token");
+          navigate("/login");
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+          // Schedule next fetch only after current one completes
+          timeoutId = setTimeout(fetchData, 2000);
+        }
       }
     };
 
     fetchData();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
   }, [navigate]);
 
   const handleLogout = async () => {
+    console.log("handleLogout function called");
     try {
       await authService.logout();
     } catch (error) {
@@ -62,14 +109,105 @@ function Dashboard() {
     }
   };
 
+  const handleMarkComplete = async () => {
+    console.log("handleMarkComplete function called", currentTicket);
+    if (currentTicket && !isProcessing) {
+      setIsProcessing(true);
+      try {
+        await queueService.completeService(currentTicket.ticket_id);
+        const response = await queueService.getStatus();
+        const { serving } = response.data;
+        const ticket = serving.find(
+          (item: QueueItem) => item.counter_id === user?.counter_id,
+        );
+        setCurrentTicket(ticket || null);
+        setServingQueue(serving);
+
+        const successMsg = `✓ Ticket ${currentTicket.priority_number} marked as completed successfully!`;
+        toast.success(successMsg);
+      } catch (error) {
+        console.error("Failed to mark complete:", error);
+        toast.error("Failed to mark complete. Please try again.");
+      } finally {
+        setIsProcessing(false);
+      }
+    }
+  };
+
+  const handleCater = async (ticket: QueueItem) => {
+    console.log("handleCater function called", {
+      counter_id: user?.counter_id,
+      ticket,
+      currentTicket,
+    });
+
+    // Check if counter is already serving a ticket
+    if (currentTicket) {
+      const errorMsg = `You are already serving ticket ${currentTicket.priority_number}. Please complete it first before serving another ticket.`;
+      console.warn(errorMsg);
+      toast.warning(errorMsg);
+      return;
+    }
+
+    if (user?.counter_id && ticket && !isProcessing) {
+      setIsProcessing(true);
+      try {
+        console.log(
+          "Calling API with ticket_id:",
+          ticket.ticket_id,
+          "counter_id:",
+          user.counter_id,
+        );
+        await queueService.callNext(user.counter_id);
+        console.log("callNext API succeeded");
+        const response = await queueService.getStatus();
+        const { serving, waiting } = response.data;
+        console.log("Updated serving queue:", serving);
+        console.log("Updated waiting queue:", waiting);
+        const foundTicket = serving.find(
+          (item: QueueItem) => item.counter_id === user.counter_id,
+        );
+        setCurrentTicket(foundTicket || null);
+        setServingQueue(serving);
+        setWaitingQueue(waiting);
+        console.log("State updated with new ticket:", foundTicket);
+
+        const successMsg = `✓ Successfully serving ticket ${foundTicket?.priority_number}`;
+        toast.success(successMsg);
+      } catch (error) {
+        console.error("Failed to cater ticket:", error);
+        toast.error("Failed to serve ticket. Please try again.");
+      } finally {
+        setIsProcessing(false);
+      }
+    } else if (!user?.counter_id || !ticket) {
+      const errorMsg =
+        "Cannot serve ticket: Missing user counter ID or ticket information.";
+      console.warn(errorMsg, { user, ticket });
+      toast.error(errorMsg);
+    }
+  };
+
   if (loading) {
     return <div className="loading">Loading...</div>;
   }
+
+  const getServingByCounter = () => {
+    console.log("getServingByCounter function called");
+    const counterMap: { [key: number]: QueueItem } = {};
+    servingQueue.forEach((item) => {
+      if (item.counter_id && !counterMap[item.counter_id]) {
+        counterMap[item.counter_id] = item;
+      }
+    });
+    return counterMap;
+  };
 
   return (
     <div className="dashboard-container">
       <header className="dashboard-header">
         <div className="header-content">
+          <img src="/dmw.png" alt="DMW Logo" className="dmw-logo" />
           <h1>Queue Management Dashboard</h1>
           <div className="user-info">
             <span>
@@ -83,43 +221,96 @@ function Dashboard() {
       </header>
 
       <main className="dashboard-main">
-        {user?.role === "superadmin" ? (
-          <div className="admin-dashboard">
-            <h2>System Administration</h2>
-            <div className="admin-stats">
-              <div className="stat-card">
-                <h3>Total Counters</h3>
-                <p className="stat-value">{counters.length}</p>
+        {user?.role === "counter" ? (
+          <div className="counter-dashboard">
+            <h2>Counter Service Panel</h2>
+            <div className="counter-content">
+              <div className="catered-section">
+                <h3>CURRENT CATERED NUMBERS</h3>
+                <div className="catered-counters">
+                  {(() => {
+                    const counterMap = getServingByCounter();
+                    return [1, 2, 3, 4, 5].map((cId) => (
+                      <div
+                        key={cId}
+                        className={`catered-counter ${
+                          user?.counter_id === cId ? "active" : ""
+                        }`}
+                      >
+                        <p className="counter-label">PRIORITY</p>
+                        <p className="counter-number">
+                          {counterMap[cId]?.priority_number || "—"}
+                        </p>
+                        <p className="counter-label">COUNTER {cId}</p>
+                      </div>
+                    ));
+                  })()}
+                </div>
               </div>
-              <div className="stat-card">
-                <h3>Active Counters</h3>
-                <p className="stat-value">
-                  {counters.filter((c) => c.current_ticket_id).length}
-                </p>
+
+              <div className="serving-section">
+                <h3>YOU ARE SERVING</h3>
+                <div className="serving-display">
+                  <p className="serving-number">
+                    {currentTicket?.priority_number || "—"}
+                  </p>
+                  <button
+                    className="mark-complete-btn"
+                    onClick={handleMarkComplete}
+                    disabled={isProcessing}
+                  >
+                    {isProcessing ? "PROCESSING..." : "MARK AS COMPLETED"}
+                  </button>
+                </div>
               </div>
             </div>
 
-            <h3>All Counters</h3>
-            <div className="counters-grid">
-              {counters.map((counter) => (
-                <div key={counter.id} className="counter-info-card">
-                  <h4>{counter.counter_name}</h4>
-                  <p>
-                    Current Ticket:{" "}
-                    <strong>
-                      {counter.currentTicket?.priority_number || "None"}
-                    </strong>
-                  </p>
+            <div className="dashboard-section">
+              <h3>Dashboard</h3>
+              <div className="not-catered">
+                <div className="not-catered-list">
+                  <p className="list-title">NOT CATERED NUMBERS:</p>
+                  {waitingQueue.slice(0, 3).map((item) => (
+                    <p key={item.ticket_id} className="not-catered-number">
+                      {item.priority_number}
+                    </p>
+                  ))}
                 </div>
-              ))}
+                <div className="actions">
+                  <p className="actions-title">ACTIONS</p>
+                  {waitingQueue.slice(0, 3).map((item) => (
+                    <button
+                      key={item.ticket_id}
+                      className="cater-btn"
+                      onClick={() => handleCater(item)}
+                      disabled={currentTicket !== null || isProcessing}
+                      title={
+                        currentTicket
+                          ? `Complete ticket ${currentTicket.priority_number} first`
+                          : isProcessing
+                            ? "Processing..."
+                            : ""
+                      }
+                    >
+                      {isProcessing
+                        ? "Processing..."
+                        : `Serving ticket ${item.priority_number}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
+
+            <Analytics
+              servingQueue={servingQueue}
+              waitingQueue={waitingQueue}
+            />
           </div>
-        ) : user?.role === "counter" ? (
-          <div className="counter-dashboard">
-            <h2>Counter Service Panel</h2>
-            <CounterPanel userId={user.id} />
+        ) : (
+          <div className="admin-dashboard">
+            <h2>System Administration</h2>
           </div>
-        ) : null}
+        )}
       </main>
     </div>
   );

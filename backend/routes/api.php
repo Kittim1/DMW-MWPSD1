@@ -13,6 +13,7 @@ Route::group(['prefix' => 'auth'], function () {
 });
 
 Route::group(['prefix' => 'queue', 'middleware' => 'auth:api'], function () {
+    Route::get('/status', [QueueController::class, 'getStatus']);
     Route::get('/waiting', [QueueController::class, 'getWaiting']);
     Route::get('/serving', [QueueController::class, 'getServing']);
     Route::post('/call-next/{counterId}', [QueueController::class, 'callNext']);

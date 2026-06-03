@@ -14,41 +14,63 @@ interface QueueDisplayProps {
 }
 
 function QueueDisplay({ title, items, type }: QueueDisplayProps) {
+  // Group serving items by counter
+  const getServingByCounter = () => {
+    const counterMap: { [key: number]: QueueItem } = {};
+    items.forEach((item) => {
+      if (item.counter_id && !counterMap[item.counter_id]) {
+        counterMap[item.counter_id] = item;
+      }
+    });
+    return counterMap;
+  };
+
   return (
     <div className="queue-section">
       <div className="queue-header">
         <h2>{title}</h2>
       </div>
       <div className="queue-content">
-        <div className={`queue-list ${type}`}>
-          {items.length === 0 ? (
-            <div className="empty-state">No items</div>
-          ) : (
-            <>
-              {type === 'serving' && (
-                <div className="serving-header">
-                  <div className="col-priority">Priority #</div>
-                  <div className="col-counter">Counter</div>
+        {type === 'serving' ? (
+          <div className="serving-grid">
+            {items.length === 0 ? (
+              <div className="empty-state">No items</div>
+            ) : (
+              <>
+                {(() => {
+                  const counterMap = getServingByCounter();
+                  const counters = Object.keys(counterMap).map(Number).sort((a, b) => a - b);
+                  
+                  return (
+                    <div className="grid-counters">
+                      {counters.map((counterId) => (
+                        <div key={counterId} className="counter-box">
+                          <div className="box-label">PRIORITY</div>
+                          <div className="box-number">{counterMap[counterId].priority_number}</div>
+                          <div className="box-label">COUNTER {counterId}</div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="waiting-grid">
+            {items.length === 0 ? (
+              <div className="empty-state">No items</div>
+            ) : (
+              items.slice(0, 6).map((item, index) => (
+                <div key={item.ticket_id || index} className="waiting-box">
+                  <div className="box-label">PRIORITY</div>
+                  <div className="box-label">NUMBER</div>
+                  <div className="box-number">{item.priority_number}</div>
                 </div>
-              )}
-              {items.map((item, index) => (
-                <div
-                  key={item.ticket_id || index}
-                  className={`queue-item ${type} ${index === 0 ? 'first' : ''}`}
-                >
-                  {type === 'waiting' ? (
-                    <div className="priority-number">{item.priority_number}</div>
-                  ) : (
-                    <>
-                      <div className="priority-number">{item.priority_number}</div>
-                      <div className="counter-number">{item.counter_id}</div>
-                    </>
-                  )}
-                </div>
-              ))}
-            </>
-          )}
-        </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

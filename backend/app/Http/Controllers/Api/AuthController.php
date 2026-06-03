@@ -24,9 +24,19 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
+        // Get counter_id if user is a counter
+        $counter_id = null;
+        if ($user->isCounter()) {
+            $counter = $user->counter()->first();
+            $counter_id = $counter?->id;
+        }
+
+        $userData = $user->toArray();
+        $userData['counter_id'] = $counter_id;
+
         return response()->json([
             'token' => $token,
-            'user' => $user,
+            'user' => $userData,
         ]);
     }
 
