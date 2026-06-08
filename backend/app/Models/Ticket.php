@@ -10,6 +10,7 @@ class Ticket extends Model
     const STATUS_WAITING = 'waiting';
     const STATUS_SERVING = 'serving';
     const STATUS_COMPLETED = 'completed';
+    const STATUS_SKIPPED = 'skipped';
 
     protected $fillable = [
         'priority_number',

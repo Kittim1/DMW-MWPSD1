@@ -42,11 +42,12 @@ function App() {
         pauseOnHover
       />
       <Routes>
+        <Route path="/" element={<Landing />} />
         <Route
           path="/login"
           element={<Login setIsAuthenticated={setIsAuthenticated} />}
         />
-        <Route path="/landing" element={<Landing />} />
+        <Route path="/landing" element={<Navigate to="/" replace />} />
         <Route path="/counter/:counterId" element={<Counter />} />
         <Route
           path="/dashboard"
@@ -56,7 +57,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="/" element={<Navigate to="/landing" replace />} />
       </Routes>
     </Router>
   );

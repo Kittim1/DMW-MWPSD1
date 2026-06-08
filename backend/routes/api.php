@@ -12,14 +12,20 @@ Route::group(['prefix' => 'auth'], function () {
     Route::post('/refresh', [AuthController::class, 'refresh'])->middleware('auth:api');
 });
 
-Route::group(['prefix' => 'queue', 'middleware' => 'auth:api'], function () {
+Route::group(['prefix' => 'queue'], function () {
     Route::get('/status', [QueueController::class, 'getStatus']);
     Route::get('/waiting', [QueueController::class, 'getWaiting']);
     Route::get('/serving', [QueueController::class, 'getServing']);
-    Route::post('/call-next/{counterId}', [QueueController::class, 'callNext']);
-    Route::post('/complete/{ticketId}', [QueueController::class, 'completeService']);
     Route::get('/tickets', [QueueController::class, 'getTickets']);
     Route::post('/tickets', [QueueController::class, 'addTicket']);
+    
+    Route::group(['middleware' => 'auth:api'], function () {
+        Route::post('/call-next/{counterId}', [QueueController::class, 'callNext']);
+        Route::post('/complete/{ticketId}', [QueueController::class, 'completeService']);
+        Route::post('/skip/{ticketId}', [QueueController::class, 'skipTicket']);
+        Route::post('/cater/{ticketId}/{counterId}', [QueueController::class, 'caterTicket']);
+        Route::post('/reset', [QueueController::class, 'resetQueue']);
+    });
 });
 
 Route::group(['prefix' => 'counters', 'middleware' => 'auth:api'], function () {

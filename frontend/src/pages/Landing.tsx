@@ -14,6 +14,7 @@ interface QueueItem {
 function Landing() {
   const [waitingQueue, setWaitingQueue] = useState<QueueItem[]>([]);
   const [servingQueue, setServingQueue] = useState<QueueItem[]>([]);
+  const [skippedQueue, setSkippedQueue] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDateTime, setCurrentDateTime] = useState<string>("");
   const [sessionInfo, setSessionInfo] = useState<string>("");
@@ -28,26 +29,35 @@ function Landing() {
   };
 
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    let isMounted = true;
+
     const fetchQueues = async () => {
       try {
-        const [waitingRes, servingRes] = await Promise.all([
-          queueService.getWaiting(),
-          queueService.getServing(),
-        ]);
+        const response = await queueService.getStatus();
+        const { serving, waiting, skipped } = response.data;
 
-        setWaitingQueue(waitingRes.data);
-        setServingQueue(servingRes.data);
+        if (!isMounted) return;
+
+        setWaitingQueue(waiting);
+        setServingQueue(serving);
+        setSkippedQueue(skipped || []);
       } catch (error) {
         console.error("Failed to fetch queue data:", error);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+          timeoutId = setTimeout(fetchQueues, 2000);
+        }
       }
     };
 
     fetchQueues();
-    const interval = setInterval(fetchQueues, 2000);
 
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   useEffect(() => {
@@ -126,7 +136,12 @@ function Landing() {
       </div>
 
       <div className="queue-display-container">
-        <QueueDisplay title="WAITING" items={waitingQueue} type="waiting" />
+        <QueueDisplay
+          title="WAITING"
+          items={waitingQueue}
+          skippedItems={skippedQueue}
+          type="waiting"
+        />
         <QueueDisplay title="SERVING" items={servingQueue} type="serving" />
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./Analytics.css";
 
-// Simple Bar Chart Component
+// Professional Bar Chart Component
 function BarChart({
   data,
   title,
@@ -9,26 +9,29 @@ function BarChart({
   data: { name: string; value: number }[];
   title: string;
 }) {
-  const maxValue = Math.max(...data.map((d) => d.value));
-  const barHeight = 200;
+  const maxValue = Math.max(...data.map((d) => d.value), 1);
+  const barHeight = 150;
 
   return (
-    <div className="chart-container bar-chart">
-      <h4>{title}</h4>
-      <div className="chart-content">
-        <div className="bars">
+    <div className="admin-analytics-card">
+      <div className="card-header">
+        <h4>{title}</h4>
+      </div>
+      <div className="chart-content bar-chart-content">
+        <div className="bars-container">
           {data.map((item, idx) => (
-            <div key={idx} className="bar-item">
-              <div className="bar-wrapper">
+            <div key={idx} className="bar-column">
+              <div className="bar-track">
                 <div
-                  className="bar"
+                  className="bar-fill"
                   style={{
                     height: `${(item.value / maxValue) * barHeight}px`,
                   }}
-                />
+                >
+                  <span className="bar-tooltip">{item.value}</span>
+                </div>
               </div>
-              <span className="bar-label">{item.name}</span>
-              <span className="bar-value">{item.value}</span>
+              <span className="bar-axis-label">{item.name}</span>
             </div>
           ))}
         </div>
@@ -37,7 +40,7 @@ function BarChart({
   );
 }
 
-// Simple Pie Chart Component
+// Professional Pie Chart Component
 function PieChart({
   data,
   title,
@@ -48,62 +51,62 @@ function PieChart({
   const total = data.reduce((sum, item) => sum + item.value, 0);
   let currentAngle = 0;
 
-  const slices = data.map((item, idx) => {
-    const percentage = (item.value / total) * 100;
-    const sliceAngle = (item.value / total) * 360;
+  const slices = data.map((item) => {
+    const percentage = total > 0 ? (item.value / total) * 100 : 0;
+    const sliceAngle = total > 0 ? (item.value / total) * 360 : 0;
     const startAngle = currentAngle;
-    const endAngle = currentAngle + sliceAngle;
+    currentAngle += sliceAngle;
 
-    const radius = 60;
+    const radius = 70;
     const circumference = 2 * Math.PI * radius;
     const strokeDashoffset = circumference - (percentage / 100) * circumference;
-
-    currentAngle = endAngle;
 
     return {
       ...item,
       percentage,
       startAngle,
-      endAngle,
       strokeDashoffset,
+      circumference
     };
   });
 
   return (
-    <div className="chart-container pie-chart">
-      <h4>{title}</h4>
-      <div className="chart-content">
-        <svg width="200" height="200" viewBox="0 0 200 200">
-          {slices.map((slice, idx) => {
-            const radius = 60;
-            const circumference = 2 * Math.PI * radius;
-            const rotation = slice.startAngle - 90;
-
-            return (
+    <div className="admin-analytics-card">
+      <div className="card-header">
+        <h4>{title}</h4>
+      </div>
+      <div className="chart-content pie-chart-content">
+        <div className="pie-svg-wrapper">
+          <svg width="160" height="160" viewBox="0 0 200 200">
+            {slices.map((slice, idx) => (
               <circle
                 key={idx}
                 cx="100"
                 cy="100"
-                r={radius}
+                r="70"
                 fill="none"
                 stroke={slice.color}
-                strokeWidth="30"
-                strokeDasharray={`${(slice.percentage / 100) * circumference} ${
-                  circumference - (slice.percentage / 100) * circumference
+                strokeWidth="40"
+                strokeDasharray={`${(slice.percentage / 100) * slice.circumference} ${
+                  slice.circumference - (slice.percentage / 100) * slice.circumference
                 }`}
-                transform={`rotate(${rotation} 100 100)`}
+                transform={`rotate(${slice.startAngle - 90} 100 100)`}
+                className="pie-slice"
               />
-            );
-          })}
-        </svg>
-        <div className="pie-legend">
+            ))}
+          </svg>
+          <div className="pie-center-label">
+            <span className="total-val">{total}</span>
+            <span className="total-lbl">Total</span>
+          </div>
+        </div>
+        <div className="pie-custom-legend">
           {slices.map((slice, idx) => (
-            <div key={idx} className="legend-item">
-              <span
-                className="legend-color"
-                style={{ backgroundColor: slice.color }}
-              />
-              <span>{slice.name}: {slice.value}</span>
+            <div key={idx} className="legend-row">
+              <span className="dot" style={{ backgroundColor: slice.color }} />
+              <span className="lbl">{slice.name}</span>
+              <span className="val">{slice.value}</span>
+              <span className="pct">{slice.percentage.toFixed(1)}%</span>
             </div>
           ))}
         </div>
@@ -112,116 +115,54 @@ function PieChart({
   );
 }
 
-// Simple Line Chart Component
-function LineChart({
-  data,
-  title,
-}: {
-  data: { name: string; value: number }[];
-  title: string;
-}) {
-  const maxValue = Math.max(...data.map((d) => d.value));
-  const chartWidth = 400;
-  const chartHeight = 150;
-  const padding = 20;
-  const pointSpacing = (chartWidth - 2 * padding) / (data.length - 1);
-
-  const points = data.map((item, idx) => ({
-    ...item,
-    x: padding + idx * pointSpacing,
-    y: chartHeight - padding - (item.value / maxValue) * (chartHeight - 2 * padding),
-  }));
-
-  const pathD = points
-    .map((point, idx) => `${idx === 0 ? "M" : "L"} ${point.x} ${point.y}`)
-    .join(" ");
-
-  return (
-    <div className="chart-container line-chart">
-      <h4>{title}</h4>
-      <div className="chart-content">
-        <svg width="100%" height="200" viewBox={`0 0 ${chartWidth} ${chartHeight}`}>
-          {/* Grid lines */}
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => (
-            <line
-              key={idx}
-              x1={padding}
-              y1={chartHeight - padding - ratio * (chartHeight - 2 * padding)}
-              x2={chartWidth - padding}
-              y2={chartHeight - padding - ratio * (chartHeight - 2 * padding)}
-              stroke="#eee"
-              strokeWidth="1"
-            />
-          ))}
-          {/* Line */}
-          <path d={pathD} stroke="#0066cc" strokeWidth="2" fill="none" />
-          {/* Points */}
-          {points.map((point, idx) => (
-            <circle key={idx} cx={point.x} cy={point.y} r="4" fill="#0066cc" />
-          ))}
-        </svg>
-      </div>
-    </div>
-  );
-}
-
 interface AnalyticsProps {
   servingQueue: any[];
   waitingQueue: any[];
+  skippedQueue?: any[];
 }
 
-function Analytics({ servingQueue, waitingQueue }: AnalyticsProps) {
+function Analytics({ servingQueue, waitingQueue, skippedQueue = [] }: AnalyticsProps) {
   const [queueStats, setQueueStats] = useState({
     perCounter: [
-      { name: "Counter 1", value: 0 },
-      { name: "Counter 2", value: 0 },
-      { name: "Counter 3", value: 0 },
-      { name: "Counter 4", value: 0 },
-      { name: "Counter 5", value: 0 },
+      { name: "C1", value: 0 },
+      { name: "C2", value: 0 },
+      { name: "C3", value: 0 },
+      { name: "C4", value: 0 },
+      { name: "C5", value: 0 },
     ],
     statusBreakdown: [
-      { name: "Serving", value: 0, color: "#28a745" },
-      { name: "Waiting", value: 0, color: "#ffc107" },
-      { name: "Completed", value: 0, color: "#0066cc" },
-    ],
-    hourlyTrend: [
-      { name: "08:00", value: 5 },
-      { name: "10:00", value: 12 },
-      { name: "12:00", value: 18 },
-      { name: "14:00", value: 15 },
-      { name: "16:00", value: 8 },
+      { name: "Serving", value: 0, color: "#4e73df" },
+      { name: "Waiting", value: 0, color: "#1cc88a" },
+      { name: "Skipped", value: 0, color: "#e74a3b" },
     ],
   });
 
   useEffect(() => {
-    // Update queue stats based on API data
     const perCounterData = [1, 2, 3, 4, 5].map((counterId) => ({
       name: `Counter ${counterId}`,
       value: servingQueue.filter((item) => item.counter_id === counterId).length,
     }));
 
-    setQueueStats((prev) => ({
-      ...prev,
+    setQueueStats({
       perCounter: perCounterData,
       statusBreakdown: [
-        { ...prev.statusBreakdown[0], value: servingQueue.length },
-        { ...prev.statusBreakdown[1], value: waitingQueue.length },
-        { ...prev.statusBreakdown[2], value: 25 }, // Mock data
+        { name: "Serving", value: servingQueue.length, color: "#4e73df" },
+        { name: "Waiting", value: waitingQueue.length, color: "#1cc88a" },
+        { name: "Skipped", value: skippedQueue.length, color: "#e74a3b" },
       ],
-    }));
-  }, [servingQueue, waitingQueue]);
+    });
+  }, [servingQueue, waitingQueue, skippedQueue]);
 
   return (
-    <div className="analytics-section">
-      <h3>Analytics Dashboard</h3>
-      <div className="charts-grid">
-        <BarChart data={queueStats.perCounter} title="Tickets per Counter" />
-        <PieChart
-          data={queueStats.statusBreakdown}
-          title="Queue Status Distribution"
-        />
-        <LineChart data={queueStats.hourlyTrend} title="Hourly Queue Trend" />
-      </div>
+    <div className="professional-analytics-grid">
+      <PieChart
+        data={queueStats.statusBreakdown}
+        title="Live Status Summary"
+      />
+      <BarChart 
+        data={queueStats.perCounter} 
+        title="Active Load per Counter" 
+      />
     </div>
   );
 }
