@@ -38,6 +38,7 @@ export const authService = {
     apiClient.post("/auth/login", { email, password }),
   logout: () => apiClient.post("/auth/logout"),
   getCurrentUser: () => apiClient.get("/auth/user"),
+  updateProfile: (data: any) => apiClient.put("/auth/profile", data),
 };
 
 export const queueService = {
@@ -50,9 +51,13 @@ export const queueService = {
     apiClient.post(`/queue/complete/${ticketId}`),
   skipTicket: (ticketId: number) =>
     apiClient.post(`/queue/skip/${ticketId}`),
+  cancelTicket: (ticketId: number) =>
+    apiClient.post(`/queue/cancel/${ticketId}`),
   caterTicket: (ticketId: number, counterId: number) =>
     apiClient.post(`/queue/cater/${ticketId}/${counterId}`),
   resetQueue: () => apiClient.post("/queue/reset"),
+  getReports: (type: string) => apiClient.get(`/queue/reports?type=${type}`),
+  getLogs: () => apiClient.get("/queue/logs"),
   getTickets: () => apiClient.get("/queue/tickets"),
   addTicket: (data: any) => apiClient.post("/queue/tickets", data),
 };

@@ -11,6 +11,7 @@ class Ticket extends Model
     const STATUS_SERVING = 'serving';
     const STATUS_COMPLETED = 'completed';
     const STATUS_SKIPPED = 'skipped';
+    const STATUS_CANCELLED = 'cancelled';
 
     protected $fillable = [
         'priority_number',

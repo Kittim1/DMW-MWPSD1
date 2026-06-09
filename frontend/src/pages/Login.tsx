@@ -29,6 +29,7 @@ function Login({ setIsAuthenticated }: LoginProps) {
 
       console.log("Login successful:", response.data.user);
       setIsAuthenticated(true);
+      toast.success(`Welcome back, ${response.data.user.name}!`);
       navigate("/dashboard");
     } catch (err: any) {
       const errorMessage =

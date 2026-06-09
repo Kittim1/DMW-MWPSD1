@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import Analytics from "../components/Analytics";
+import Reports from "../components/Reports";
+import Settings from "../components/Settings";
+import Sidebar from "../components/Sidebar";
+import SystemLogs from "../components/SystemLogs";
 import { authService, counterService, queueService } from "../services/api";
 import "./Dashboard.css";
 
@@ -27,8 +31,13 @@ function Dashboard() {
   const [skippedQueue, setSkippedQueue] = useState<QueueItem[]>([]);
   const [counters, setCounters] = useState<any[]>([]);
   const [currentTicket, setCurrentTicket] = useState<QueueItem | null>(null);
+  const [stats, setStats] = useState<{
+    counterCounts: { [key: number]: number };
+    sessionTotals: { morning: number; afternoon: number };
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [activeView, setActiveView] = useState("dashboard");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -53,7 +62,7 @@ function Dashboard() {
 
         const apiStart = performance.now();
         const response = await queueService.getStatus();
-        const { serving, waiting, skipped } = response.data;
+        const { serving, waiting, skipped, stats: apiStats } = response.data;
         const apiTime = performance.now() - apiStart;
         console.log(`API fetch time: ${apiTime.toFixed(2)}ms`);
 
@@ -63,6 +72,7 @@ function Dashboard() {
         setServingQueue(serving);
         setWaitingQueue(waiting);
         setSkippedQueue(skipped || []);
+        setStats(apiStats || null);
 
         // Fetch counters if superadmin
         if (parsedUser?.role === "superadmin") {
@@ -106,16 +116,24 @@ function Dashboard() {
   }, [navigate]);
 
   const handleLogout = async () => {
-    console.log("handleLogout function called");
-    try {
-      await authService.logout();
-    } catch (error) {
-      console.error("Logout error:", error);
-    } finally {
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("user");
-      navigate("/login");
+    if (window.confirm("Are you sure you want to log out?")) {
+      try {
+        await authService.logout();
+        toast.info("Logged out successfully.");
+      } catch (error) {
+        console.error("Logout failed:", error);
+        toast.error("Logout failed. Please try again.");
+      } finally {
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("user");
+        navigate("/login");
+      }
     }
+  };
+
+  const handleUserUpdate = (updatedUser: any) => {
+    setUser(updatedUser);
+    localStorage.setItem("user", JSON.stringify(updatedUser));
   };
 
   const handleMarkComplete = async () => {
@@ -196,6 +214,32 @@ function Dashboard() {
       } catch (error) {
         console.error("Failed to cater ticket again:", error);
         toast.error("Failed to serve ticket. Please try again.");
+      } finally {
+        setIsProcessing(false);
+      }
+    }
+  };
+
+  const handleCancelTicket = async (ticket: QueueItem) => {
+    if (
+      window.confirm(
+        `Are you sure you want to cancel ticket ${ticket.priority_number}? This number will be removed from the queue entirely.`,
+      )
+    ) {
+      setIsProcessing(true);
+      try {
+        await queueService.cancelTicket(ticket.ticket_id);
+        const response = await queueService.getStatus();
+        const { serving, waiting, skipped } = response.data;
+
+        setServingQueue(serving);
+        setWaitingQueue(waiting);
+        setSkippedQueue(skipped || []);
+
+        toast.info(`Ticket ${ticket.priority_number} has been cancelled.`);
+      } catch (error) {
+        console.error("Failed to cancel ticket:", error);
+        toast.error("Failed to cancel ticket. Please try again.");
       } finally {
         setIsProcessing(false);
       }
@@ -314,206 +358,201 @@ function Dashboard() {
   };
 
   return (
-    <div className="dashboard-container">
-      <header className="dashboard-header">
-        <div className="header-content">
-          <img src="/dmw.png" alt="DMW Logo" className="dmw-logo" />
-          <h1>Queue Management Dashboard</h1>
-          <div className="user-info">
-            <span>
-              Welcome, {user?.name} ({user?.role})
-            </span>
-            <button onClick={handleLogout} className="btn btn-danger">
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="dashboard-layout">
+      <Sidebar
+        role={user?.role || ""}
+        onLogout={handleLogout}
+        activeView={activeView}
+        setActiveView={setActiveView}
+      />
 
-      <main className="dashboard-main">
-        {user?.role === "counter" ? (
-          <div className="counter-dashboard">
-            <h2>Counter Service Panel</h2>
-            <div className="counter-content">
-              <div className="catered-section">
-                <h3>CURRENT CATERED NUMBERS</h3>
-                <div className="catered-counters">
-                  {(() => {
-                    const counterMap = getServingByCounter();
-                    return [1, 2, 3, 4, 5].map((cId) => (
+      <div className="dashboard-container">
+        <header className="dashboard-header">
+          <div className="header-content">
+            <h1>
+              {activeView === "dashboard"
+                ? "Queue Management Dashboard"
+                : activeView === "reports"
+                  ? "Reports & Analytics"
+                  : activeView === "logs"
+                    ? "System Activity Logs"
+                    : "Settings"}
+            </h1>
+            <div className="user-info">
+              <span className="user-name">
+                Welcome, {user?.name} ({user?.role})
+              </span>
+            </div>
+          </div>
+        </header>
+
+        <main className="dashboard-main">
+          {activeView === "reports" ? (
+            <Reports />
+          ) : activeView === "logs" ? (
+            <SystemLogs />
+          ) : activeView === "settings" ? (
+            <Settings user={user} onUserUpdate={handleUserUpdate} />
+          ) : user?.role === "counter" ? (
+            <div className="counter-dashboard">
+              <h2>Counter Service Panel</h2>
+              <div className="counter-stats-container">
+                <div className="stats-card">
+                  <h4>Today's Performance</h4>
+                  <div className="counter-counts-grid">
+                    {[1, 2, 3, 4, 5].map((cId) => (
                       <div
                         key={cId}
-                        className={`catered-counter ${
-                          user?.counter_id === cId ? "active" : ""
-                        }`}
+                        className={`count-item ${user?.counter_id === cId ? "highlight" : ""}`}
                       >
-                        <p className="counter-label">PRIORITY</p>
-                        <p className="counter-number">
-                          {counterMap[cId]?.priority_number || "—"}
-                        </p>
-                        <p className="counter-label">COUNTER {cId}</p>
-                      </div>
-                    ));
-                  })()}
-                </div>
-              </div>
-
-              <div className="serving-section">
-                <h3>YOU ARE SERVING</h3>
-                <div className="serving-display">
-                  <p className="serving-number">
-                    {currentTicket?.priority_number || "—"}
-                  </p>
-                  <button
-                    className="mark-complete-btn"
-                    onClick={handleMarkComplete}
-                    disabled={isProcessing || !currentTicket}
-                  >
-                    {isProcessing ? "PROCESSING..." : "MARK AS COMPLETED"}
-                  </button>
-                  {currentTicket && (
-                    <button
-                      className="skip-link-btn"
-                      onClick={handleSkip}
-                      disabled={isProcessing}
-                    >
-                      SKIP THIS NUMBER
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="dashboard-section">
-              <h3>Dashboard</h3>
-              <div className="not-catered">
-                <div className="queue-list-column">
-                  <div className="not-catered-list">
-                    <p className="list-title">NOT CATERED NUMBERS:</p>
-                    {waitingQueue.slice(0, 3).map((item) => (
-                      <p key={item.ticket_id} className="not-catered-number">
-                        {item.priority_number}
-                      </p>
-                    ))}
-                  </div>
-                  <div className="skipped-list">
-                    <p className="list-title">SKIPPED NUMBERS:</p>
-                    {skippedQueue.slice(0, 3).map((item) => (
-                      <p key={item.ticket_id} className="skipped-number">
-                        {item.priority_number}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="actions-column">
-                  <div className="not-catered-actions">
-                    <p className="actions-title">ACTIONS</p>
-                    {waitingQueue.slice(0, 3).map((item) => (
-                      <button
-                        key={item.ticket_id}
-                        className="cater-btn"
-                        onClick={() => handleCater(item)}
-                        disabled={currentTicket !== null || isProcessing}
-                        title={
-                          currentTicket
-                            ? `Complete ticket ${currentTicket.priority_number} first`
-                            : isProcessing
-                              ? "Processing..."
-                              : ""
-                        }
-                      >
-                        {isProcessing ? "Processing..." : `CATER`}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="skipped-actions">
-                    <p className="actions-title invisible">ACTIONS</p>
-                    {skippedQueue.slice(0, 3).map((item) => (
-                      <button
-                        key={item.ticket_id}
-                        className="cater-again-btn"
-                        onClick={() => handleCaterAgain(item)}
-                        disabled={currentTicket !== null || isProcessing}
-                      >
-                        {isProcessing ? "..." : "CATER AGAIN"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <Analytics
-              servingQueue={servingQueue}
-              waitingQueue={waitingQueue}
-            />
-          </div>
-        ) : (
-          <div className="admin-dashboard">
-            <div className="admin-header-row">
-              <h2>Super Admin Control Panel</h2>
-              <button
-                className="btn btn-danger btn-large"
-                onClick={handleResetQueue}
-                disabled={isProcessing}
-              >
-                {isProcessing ? "RESETTING..." : "RESET TODAY'S QUEUE"}
-              </button>
-            </div>
-
-            <div className="overview-stats">
-              <div className="stat-box">
-                <span className="stat-label">TOTAL TICKETS</span>
-                <span className="stat-value">
-                  {waitingQueue.length +
-                    servingQueue.length +
-                    skippedQueue.length}
-                </span>
-              </div>
-              <div className="stat-box">
-                <span className="stat-label">WAITING</span>
-                <span className="stat-value">{waitingQueue.length}</span>
-              </div>
-              <div className="stat-box">
-                <span className="stat-label">SERVING</span>
-                <span className="stat-value">{servingQueue.length}</span>
-              </div>
-              <div className="stat-box">
-                <span className="stat-label">SKIPPED</span>
-                <span className="stat-value">{skippedQueue.length}</span>
-              </div>
-            </div>
-
-            <div className="admin-grid">
-              <div className="admin-card counters-status">
-                <h3>COUNTER STATUS</h3>
-                <div className="counters-list">
-                  {counters.map((counter) => (
-                    <div key={counter.id} className="counter-item-admin">
-                      <div className="counter-info">
-                        <span className="counter-name">
-                          {counter.counter_name}
-                        </span>
-                        <span
-                          className={`status-badge ${counter.is_active ? "active" : "inactive"}`}
-                        >
-                          {counter.is_active ? "ACTIVE" : "INACTIVE"}
-                        </span>
-                        <span className="current-user">
-                          User: {counter.user?.name || "Unassigned"}
+                        <span className="count-label">C{cId}</span>
+                        <span className="count-value">
+                          {stats?.counterCounts[cId] || 0}
                         </span>
                       </div>
-                      <div className="counter-actions">
-                        <button
-                          className={`btn ${counter.is_active ? "btn-warning" : "btn-success"}`}
-                          onClick={() => handleToggleCounter(counter)}
-                        >
-                          {counter.is_active ? "DISABLE" : "ENABLE"}
-                        </button>
-                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="stats-card">
+                  <h4>Session Totals</h4>
+                  <div className="session-counts">
+                    <div className="session-item">
+                      <span className="session-label">Morning</span>
+                      <span className="session-value">
+                        {stats?.sessionTotals.morning || 0}
+                      </span>
                     </div>
-                  ))}
+                    <div className="session-divider"></div>
+                    <div className="session-item">
+                      <span className="session-label">Afternoon</span>
+                      <span className="session-value">
+                        {stats?.sessionTotals.afternoon || 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="counter-content">
+                <div className="catered-section">
+                  <h3>CURRENT CATERED NUMBERS</h3>
+                  <div className="catered-counters">
+                    {(() => {
+                      const counterMap = getServingByCounter();
+                      return [1, 2, 3, 4, 5].map((cId) => (
+                        <div
+                          key={cId}
+                          className={`catered-counter ${
+                            user?.counter_id === cId ? "active" : ""
+                          }`}
+                        >
+                          <p className="counter-label">PRIORITY</p>
+                          <p className="counter-number">
+                            {counterMap[cId]?.priority_number || "—"}
+                          </p>
+                          <p className="counter-label">COUNTER {cId}</p>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+
+                <div className="serving-section">
+                  <h3>YOU ARE SERVING</h3>
+                  <div className="serving-display">
+                    <p className="serving-number">
+                      {currentTicket?.priority_number || "—"}
+                    </p>
+                    <button
+                      className="mark-complete-btn"
+                      onClick={handleMarkComplete}
+                      disabled={isProcessing || !currentTicket}
+                    >
+                      {isProcessing ? "PROCESSING..." : "MARK AS COMPLETED"}
+                    </button>
+                    {currentTicket && (
+                      <button
+                        className="skip-link-btn"
+                        onClick={handleSkip}
+                        disabled={isProcessing}
+                      >
+                        SKIP THIS NUMBER
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="dashboard-section">
+                <h3>Dashboard</h3>
+                <div className="dashboard-content-grid">
+                  <div className="dashboard-block">
+                    <div className="block-column">
+                      <p className="list-title">NOT CATERED NUMBERS:</p>
+                      {waitingQueue.slice(0, 3).map((item) => (
+                        <p key={item.ticket_id} className="not-catered-number">
+                          {item.priority_number}
+                        </p>
+                      ))}
+                    </div>
+                    <div className="block-column">
+                      <p className="actions-title">ACTIONS</p>
+                      {waitingQueue.slice(0, 3).map((item) => (
+                        <button
+                          key={item.ticket_id}
+                          className="cater-btn"
+                          onClick={() => handleCater(item)}
+                          disabled={currentTicket !== null || isProcessing}
+                          title={
+                            currentTicket
+                              ? `Complete ticket ${currentTicket.priority_number} first`
+                              : isProcessing
+                                ? "Processing..."
+                                : ""
+                          }
+                        >
+                          {isProcessing ? "Processing..." : `CATER`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="dashboard-block">
+                    <div className="block-column">
+                      <p className="list-title">SKIPPED NUMBERS:</p>
+                      {skippedQueue.slice(0, 3).map((item) => (
+                        <p key={item.ticket_id} className="skipped-number">
+                          {item.priority_number}
+                        </p>
+                      ))}
+                    </div>
+                    <div className="block-column">
+                      <p className="actions-title">ACTIONS</p>
+                      {skippedQueue.slice(0, 3).map((item) => (
+                        <div
+                          key={item.ticket_id}
+                          className="skipped-actions-row"
+                        >
+                          <button
+                            className="cater-again-btn"
+                            onClick={() => handleCaterAgain(item)}
+                            disabled={currentTicket !== null || isProcessing}
+                          >
+                            {isProcessing ? "..." : "CATER AGAIN"}
+                          </button>
+                          <button
+                            className="cancel-btn"
+                            onClick={() => handleCancelTicket(item)}
+                            disabled={isProcessing}
+                            title="Cancel this ticket"
+                          >
+                            X
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -523,9 +562,87 @@ function Dashboard() {
                 skippedQueue={skippedQueue}
               />
             </div>
-          </div>
-        )}
-      </main>
+          ) : (
+            <div className="admin-dashboard">
+              <div className="admin-header-row">
+                <h2>Super Admin Control Panel</h2>
+                <button
+                  className="btn btn-danger btn-large"
+                  onClick={handleResetQueue}
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? "RESETTING..." : "RESET TODAY'S QUEUE"}
+                </button>
+              </div>
+
+              <div className="overview-stats">
+                <div className="stat-box">
+                  <span className="stat-label">TOTAL TICKETS</span>
+                  <span className="stat-value">
+                    {waitingQueue.length +
+                      servingQueue.length +
+                      skippedQueue.length}
+                  </span>
+                </div>
+                <div className="stat-box">
+                  <span className="stat-label">WAITING</span>
+                  <span className="stat-value">{waitingQueue.length}</span>
+                </div>
+                <div className="stat-box">
+                  <span className="stat-label">SERVING</span>
+                  <span className="stat-value">{servingQueue.length}</span>
+                </div>
+                <div className="stat-box">
+                  <span className="stat-label">SKIPPED</span>
+                  <span className="stat-value">{skippedQueue.length}</span>
+                </div>
+              </div>
+
+              <div className="admin-grid">
+                <div className="admin-card counters-status">
+                  <h3>COUNTER STATUS</h3>
+                  <div className="counters-list">
+                    {counters.map((counter) => (
+                      <div key={counter.id} className="counter-item-admin">
+                        <div className="counter-info">
+                          <span className="counter-name">
+                            {counter.counter_name}
+                          </span>
+                          <span
+                            className={`status-badge ${counter.is_active ? "active" : "inactive"}`}
+                          >
+                            {counter.is_active ? "ACTIVE" : "INACTIVE"}
+                          </span>
+                          <span className="current-user">
+                            User: {counter.user?.name || "Unassigned"}
+                          </span>
+                        </div>
+                        <div className="counter-actions">
+                          <button
+                            className={`btn ${counter.is_active ? "btn-warning" : "btn-success"}`}
+                            onClick={() => handleToggleCounter(counter)}
+                          >
+                            {counter.is_active ? "DISABLE" : "ENABLE"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <Analytics
+                  servingQueue={servingQueue}
+                  waitingQueue={waitingQueue}
+                  skippedQueue={skippedQueue}
+                />
+              </div>
+
+              {/* Reports section below the main admin grid */}
+              <Reports />
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }

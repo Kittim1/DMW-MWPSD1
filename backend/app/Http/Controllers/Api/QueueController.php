@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Ticket;
 use App\Models\Counter;
+use App\Models\Ticket;
+use App\Models\SystemLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
@@ -122,10 +123,30 @@ class QueueController extends Controller
             ->orderBy('updated_at', 'desc')
             ->get(['id as ticket_id', 'priority_number', 'counter_id', 'status']);
 
+        // New: Get counts for individual counters and session totals
+        $dailyTickets = Ticket::where('session_date', $sessionDate)->get();
+        
+        $counterCounts = [];
+        for ($i = 1; $i <= 5; $i++) {
+            $counterCounts[$i] = $dailyTickets
+                ->where('counter_id', $i)
+                ->where('status', Ticket::STATUS_COMPLETED)
+                ->count();
+        }
+
+        $sessionTotals = [
+            'morning' => $dailyTickets->where('session_type', 'morning')->where('status', Ticket::STATUS_COMPLETED)->count(),
+            'afternoon' => $dailyTickets->where('session_type', 'afternoon')->where('status', Ticket::STATUS_COMPLETED)->count(),
+        ];
+
         return response()->json([
             'serving' => $serving,
             'waiting' => $waiting,
-            'skipped' => $skipped
+            'skipped' => $skipped,
+            'stats' => [
+                'counterCounts' => $counterCounts,
+                'sessionTotals' => $sessionTotals
+            ]
         ]);
     }
 
@@ -138,6 +159,25 @@ class QueueController extends Controller
         $sessionDate = $this->getCurrentSessionDate();
         $sessionType = $this->getCurrentSessionType();
 
+        // New: Check if the counter's current ticket is from a previous session
+        if ($counter->current_ticket_id) {
+            $currentTicket = Ticket::find($counter->current_ticket_id);
+            if (!$currentTicket || 
+                $currentTicket->session_date !== $sessionDate || 
+                $currentTicket->session_type !== $sessionType ||
+                $currentTicket->status !== Ticket::STATUS_SERVING) {
+                
+                // The ticket is stale or finished, free the counter automatically
+                $counter->update(['current_ticket_id' => null]);
+                $counter->refresh();
+            }
+        }
+
+        // Check if counter is already serving something (now with stale check above)
+        if ($counter->current_ticket_id) {
+            return response()->json(['message' => 'Counter is already serving a ticket'], 400);
+        }
+
         $nextTicket = Ticket::where('session_date', $sessionDate)
             ->where('session_type', $sessionType)
             ->where('status', Ticket::STATUS_WAITING)
@@ -145,7 +185,7 @@ class QueueController extends Controller
             ->first();
 
         if (!$nextTicket) {
-            return response()->json(['message' => 'No tickets in queue'], 400);
+            return response()->json(['message' => 'No more tickets in queue'], 404);
         }
 
         $nextTicket->update([
@@ -156,7 +196,14 @@ class QueueController extends Controller
 
         $counter->update(['current_ticket_id' => $nextTicket->id]);
 
-        return response()->json(['message' => 'Ticket called', 'ticket' => $nextTicket]);
+        // Log the action
+        SystemLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'catered',
+            'details' => "Counter {$counterId} catered priority number {$nextTicket->priority_number}"
+        ]);
+
+        return response()->json($nextTicket);
     }
 
     public function completeService($ticketId)
@@ -170,6 +217,13 @@ class QueueController extends Controller
 
         if ($ticket->counter_id) {
             Counter::find($ticket->counter_id)->update(['current_ticket_id' => null]);
+            
+            // Log the action
+            SystemLog::create([
+                'user_id' => auth()->id(),
+                'action' => 'completed',
+                'details' => "Counter {$ticket->counter_id} completed the transaction for priority number {$ticket->priority_number}"
+            ]);
         }
 
         return response()->json(['message' => 'Service completed', 'ticket' => $ticket]);
@@ -187,13 +241,58 @@ class QueueController extends Controller
         // Also update counter to not have a current ticket
         Counter::where('current_ticket_id', $ticketId)->update(['current_ticket_id' => null]);
 
+        // Log the action
+        SystemLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'skipped',
+            'details' => "Counter " . (auth()->user()->counter?->id ?? 'N/A') . " skipped priority number {$ticket->priority_number}"
+        ]);
+
         return response()->json(['message' => 'Ticket skipped', 'ticket' => $ticket]);
+    }
+
+    public function cancelTicket($ticketId)
+    {
+        $ticket = Ticket::findOrFail($ticketId);
+
+        $ticket->update([
+            'status' => Ticket::STATUS_CANCELLED,
+            'counter_id' => null,
+        ]);
+
+        // Ensure counter is freed if it was somehow still linked
+        Counter::where('current_ticket_id', $ticketId)->update(['current_ticket_id' => null]);
+
+        // Log the action
+        SystemLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'cancelled',
+            'details' => "Counter " . (auth()->user()->counter?->id ?? 'N/A') . " cancelled priority number {$ticket->priority_number}"
+        ]);
+
+        return response()->json(['message' => 'Ticket cancelled', 'ticket' => $ticket]);
     }
 
     public function caterTicket($ticketId, $counterId)
     {
         $ticket = Ticket::findOrFail($ticketId);
         $counter = Counter::findOrFail($counterId);
+
+        $sessionDate = $this->getCurrentSessionDate();
+        $sessionType = $this->getCurrentSessionType();
+
+        // New: Check if the counter's current ticket is from a previous session
+        if ($counter->current_ticket_id) {
+            $currentServing = Ticket::find($counter->current_ticket_id);
+            if (!$currentServing || 
+                $currentServing->session_date !== $sessionDate || 
+                $currentServing->session_type !== $sessionType ||
+                $currentServing->status !== Ticket::STATUS_SERVING) {
+                
+                $counter->update(['current_ticket_id' => null]);
+                $counter->refresh();
+            }
+        }
 
         // Check if counter is already serving something
         if ($counter->current_ticket_id) {
@@ -207,6 +306,13 @@ class QueueController extends Controller
         ]);
 
         $counter->update(['current_ticket_id' => $ticket->id]);
+
+        // Log the action
+        SystemLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'catered_again',
+            'details' => "Counter {$counterId} catered skipped priority number {$ticket->priority_number} again"
+        ]);
 
         return response()->json(['message' => 'Ticket called again', 'ticket' => $ticket]);
     }
@@ -251,6 +357,43 @@ class QueueController extends Controller
         Counter::query()->update(['current_ticket_id' => null]);
 
         return response()->json(['message' => 'Queue reset successfully']);
+    }
+
+    public function getReports(Request $request)
+    {
+        $type = $request->query('type', 'daily');
+        $now = now();
+
+        $query = Ticket::query();
+
+        if ($type === 'daily') {
+            $query->whereDate('session_date', $now->toDateString());
+        } elseif ($type === 'monthly') {
+            $query->whereMonth('session_date', $now->month)
+                  ->whereYear('session_date', $now->year);
+        } elseif ($type === 'yearly') {
+            $query->whereYear('session_date', $now->year);
+        }
+
+        $tickets = $query->get();
+
+        return response()->json([
+            'totalTickets' => $tickets->count(),
+            'served' => $tickets->where('status', Ticket::STATUS_COMPLETED)->count(),
+            'skipped' => $tickets->where('status', Ticket::STATUS_SKIPPED)->count(),
+            'cancelled' => $tickets->where('status', Ticket::STATUS_CANCELLED)->count(),
+            'avgWaitTime' => '12m', // Placeholder for actual calculation
+        ]);
+    }
+
+    public function getSystemLogs()
+    {
+        $logs = SystemLog::with('user')
+            ->orderBy('created_at', 'desc')
+            ->limit(100)
+            ->get();
+
+        return response()->json($logs);
     }
 }
 
