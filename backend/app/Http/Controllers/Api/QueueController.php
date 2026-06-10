@@ -356,6 +356,13 @@ class QueueController extends Controller
         // Reset all counters' current_ticket_id
         Counter::query()->update(['current_ticket_id' => null]);
 
+        // Log the action
+        SystemLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'reset_queue',
+            'details' => "Super Admin reset the entire queue for " . $sessionDate . " (" . $sessionType . ")"
+        ]);
+
         return response()->json(['message' => 'Queue reset successfully']);
     }
 
@@ -377,12 +384,25 @@ class QueueController extends Controller
 
         $tickets = $query->get();
 
+        // Calculate actual average wait time (from creation/session start to being called)
+        $calledTickets = $tickets->whereNotNull('called_at');
+        $avgWaitTime = '0m';
+        
+        if ($calledTickets->count() > 0) {
+            $totalWaitMinutes = $calledTickets->reduce(function ($carry, $ticket) {
+                return $carry + $ticket->called_at->diffInMinutes($ticket->created_at);
+            }, 0);
+            
+            $avgMinutes = round($totalWaitMinutes / $calledTickets->count());
+            $avgWaitTime = $avgMinutes . 'm';
+        }
+
         return response()->json([
             'totalTickets' => $tickets->count(),
             'served' => $tickets->where('status', Ticket::STATUS_COMPLETED)->count(),
             'skipped' => $tickets->where('status', Ticket::STATUS_SKIPPED)->count(),
             'cancelled' => $tickets->where('status', Ticket::STATUS_CANCELLED)->count(),
-            'avgWaitTime' => '12m', // Placeholder for actual calculation
+            'avgWaitTime' => $avgWaitTime,
         ]);
     }
 

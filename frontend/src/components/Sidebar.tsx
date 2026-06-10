@@ -12,7 +12,7 @@ function Sidebar({ role, onLogout, activeView, setActiveView }: SidebarProps) {
     <div className="sidebar">
       <div className="sidebar-header">
         <img src="/dmw.png" alt="DMW Logo" className="sidebar-logo" />
-        <h2 className="sidebar-title">DMW QUEUE</h2>
+        <h2 className="sidebar-title">DMW MWPSD</h2>
       </div>
 
       <nav className="sidebar-nav">

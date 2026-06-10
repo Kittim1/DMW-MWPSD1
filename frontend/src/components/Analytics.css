@@ -1,8 +1,8 @@
 .professional-analytics-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 20px;
-  margin-top: 20px;
+  width: 100%;
 }
 
 .admin-analytics-card {
@@ -42,7 +42,9 @@
 /* Pie Chart Styling */
 .pie-chart-content {
   flex-direction: row;
-  gap: 30px;
+  gap: 15px; /* Reduced gap to fit better */
+  padding: 15px;
+  flex-wrap: wrap; /* Allow wrapping if too narrow */
 }
 
 .pie-svg-wrapper {

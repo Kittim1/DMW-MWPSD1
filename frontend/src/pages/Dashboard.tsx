@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import Swal from "sweetalert2";
 import Analytics from "../components/Analytics";
 import Reports from "../components/Reports";
 import Settings from "../components/Settings";
@@ -116,7 +117,17 @@ function Dashboard() {
   }, [navigate]);
 
   const handleLogout = async () => {
-    if (window.confirm("Are you sure you want to log out?")) {
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "You will be logged out of your session.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#4e73df",
+      cancelButtonColor: "#858796",
+      confirmButtonText: "Yes, log me out",
+    });
+
+    if (result.isConfirmed) {
       try {
         await authService.logout();
         toast.info("Logged out successfully.");
@@ -221,11 +232,17 @@ function Dashboard() {
   };
 
   const handleCancelTicket = async (ticket: QueueItem) => {
-    if (
-      window.confirm(
-        `Are you sure you want to cancel ticket ${ticket.priority_number}? This number will be removed from the queue entirely.`,
-      )
-    ) {
+    const result = await Swal.fire({
+      title: "Cancel Ticket?",
+      text: `Are you sure you want to cancel ticket ${ticket.priority_number}? This will remove it from the queue entirely.`,
+      icon: "error",
+      showCancelButton: true,
+      confirmButtonColor: "#e74a3b",
+      cancelButtonColor: "#858796",
+      confirmButtonText: "Yes, cancel it",
+    });
+
+    if (result.isConfirmed) {
       setIsProcessing(true);
       try {
         await queueService.cancelTicket(ticket.ticket_id);
@@ -235,6 +252,11 @@ function Dashboard() {
         setServingQueue(serving);
         setWaitingQueue(waiting);
         setSkippedQueue(skipped || []);
+
+        // Clear current ticket if it was the one cancelled
+        if (ticket.ticket_id === currentTicket?.ticket_id) {
+          setCurrentTicket(null);
+        }
 
         toast.info(`Ticket ${ticket.priority_number} has been cancelled.`);
       } catch (error) {
@@ -270,8 +292,9 @@ function Dashboard() {
           "counter_id:",
           user.counter_id,
         );
-        await queueService.callNext(user.counter_id);
-        console.log("callNext API succeeded");
+        // Use caterTicket instead of callNext to ensure we get the specific ticket clicked
+        await queueService.caterTicket(ticket.ticket_id, user.counter_id);
+        console.log("caterTicket API succeeded");
         const response = await queueService.getStatus();
         const { serving, waiting, skipped } = response.data;
         console.log("Updated serving queue:", serving);
@@ -302,11 +325,17 @@ function Dashboard() {
   };
 
   const handleResetQueue = async () => {
-    if (
-      window.confirm(
-        "Are you sure you want to reset the entire queue? This will delete all current tickets for this session.",
-      )
-    ) {
+    const result = await Swal.fire({
+      title: "Reset Today's Queue?",
+      text: "This will delete ALL tickets and reset all counters. This action cannot be undone!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#e74a3b",
+      cancelButtonColor: "#858796",
+      confirmButtonText: "Yes, Reset Everything",
+    });
+
+    if (result.isConfirmed) {
       setIsProcessing(true);
       try {
         await queueService.resetQueue();
@@ -395,7 +424,7 @@ function Dashboard() {
             <Settings user={user} onUserUpdate={handleUserUpdate} />
           ) : user?.role === "counter" ? (
             <div className="counter-dashboard">
-              <h2>Counter Service Panel</h2>
+              {/* <h2>Counter Service Panel</h2> */}
               <div className="counter-stats-container">
                 <div className="stats-card">
                   <h4>Today's Performance</h4>
@@ -464,21 +493,41 @@ function Dashboard() {
                     <p className="serving-number">
                       {currentTicket?.priority_number || "—"}
                     </p>
-                    <button
-                      className="mark-complete-btn"
-                      onClick={handleMarkComplete}
-                      disabled={isProcessing || !currentTicket}
-                    >
-                      {isProcessing ? "PROCESSING..." : "MARK AS COMPLETED"}
-                    </button>
-                    {currentTicket && (
+                    {!currentTicket ? (
                       <button
-                        className="skip-link-btn"
-                        onClick={handleSkip}
+                        className="call-next-btn"
+                        onClick={() => handleCater(waitingQueue[0])}
+                        disabled={isProcessing || waitingQueue.length === 0}
+                      >
+                        {isProcessing ? "PROCESSING..." : "CALL NEXT TICKET"}
+                      </button>
+                    ) : (
+                      <button
+                        className="mark-complete-btn"
+                        onClick={handleMarkComplete}
                         disabled={isProcessing}
                       >
-                        SKIP THIS NUMBER
+                        {isProcessing ? "PROCESSING..." : "MARK AS COMPLETED"}
                       </button>
+                    )}
+                    {currentTicket && (
+                      <div className="serving-actions-secondary">
+                        <button
+                          className="skip-link-btn"
+                          onClick={handleSkip}
+                          disabled={isProcessing}
+                        >
+                          SKIP THIS NUMBER
+                        </button>
+                        <span className="action-divider">|</span>
+                        <button
+                          className="cancel-link-btn"
+                          onClick={() => handleCancelTicket(currentTicket)}
+                          disabled={isProcessing}
+                        >
+                          CANCEL TICKET
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -489,8 +538,8 @@ function Dashboard() {
                 <div className="dashboard-content-grid">
                   <div className="dashboard-block">
                     <div className="block-column">
-                      <p className="list-title">NOT CATERED NUMBERS:</p>
-                      {waitingQueue.slice(0, 3).map((item) => (
+                      <p className="list-title">NOT CATERED NUMBERS</p>
+                      {waitingQueue.slice(0, 5).map((item) => (
                         <p key={item.ticket_id} className="not-catered-number">
                           {item.priority_number}
                         </p>
@@ -498,30 +547,42 @@ function Dashboard() {
                     </div>
                     <div className="block-column">
                       <p className="actions-title">ACTIONS</p>
-                      {waitingQueue.slice(0, 3).map((item) => (
-                        <button
+                      {waitingQueue.slice(0, 5).map((item) => (
+                        <div
                           key={item.ticket_id}
-                          className="cater-btn"
-                          onClick={() => handleCater(item)}
-                          disabled={currentTicket !== null || isProcessing}
-                          title={
-                            currentTicket
-                              ? `Complete ticket ${currentTicket.priority_number} first`
-                              : isProcessing
-                                ? "Processing..."
-                                : ""
-                          }
+                          className="waiting-actions-row"
                         >
-                          {isProcessing ? "Processing..." : `CATER`}
-                        </button>
+                          <button
+                            className="cater-btn"
+                            onClick={() => handleCater(item)}
+                            disabled={currentTicket !== null || isProcessing}
+                            title={
+                              currentTicket
+                                ? `Complete ticket ${currentTicket.priority_number} first`
+                                : isProcessing
+                                  ? "Processing..."
+                                  : ""
+                            }
+                          >
+                            {isProcessing ? "Processing..." : `CATER`}
+                          </button>
+                          <button
+                            className="cancel-btn"
+                            onClick={() => handleCancelTicket(item)}
+                            disabled={isProcessing}
+                            title="Cancel this ticket"
+                          >
+                            X
+                          </button>
+                        </div>
                       ))}
                     </div>
                   </div>
 
                   <div className="dashboard-block">
                     <div className="block-column">
-                      <p className="list-title">SKIPPED NUMBERS:</p>
-                      {skippedQueue.slice(0, 3).map((item) => (
+                      <p className="list-title">SKIPPED NUMBERS</p>
+                      {skippedQueue.slice(0, 5).map((item) => (
                         <p key={item.ticket_id} className="skipped-number">
                           {item.priority_number}
                         </p>
@@ -529,7 +590,7 @@ function Dashboard() {
                     </div>
                     <div className="block-column">
                       <p className="actions-title">ACTIONS</p>
-                      {skippedQueue.slice(0, 3).map((item) => (
+                      {skippedQueue.slice(0, 5).map((item) => (
                         <div
                           key={item.ticket_id}
                           className="skipped-actions-row"

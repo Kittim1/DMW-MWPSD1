@@ -136,10 +136,36 @@
 
 /* Admin Grid Layout */
 .admin-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: 25px;
   margin-bottom: 25px;
+  align-items: stretch;
+  flex-wrap: wrap; /* Allow wrapping on smaller screens */
+}
+
+.counters-status {
+  flex: 1 1 400px; /* Allow growing and shrinking, with a base of 400px */
+  min-width: 300px;
+}
+
+.professional-analytics-grid {
+  flex: 2 1 600px; /* Take more space for the charts */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-top: 0;
+}
+
+@media (max-width: 1200px) {
+  .admin-grid {
+    flex-direction: column;
+  }
+
+  .counters-status,
+  .professional-analytics-grid {
+    flex: 1 1 auto;
+    width: 100%;
+  }
 }
 
 .admin-card {
@@ -336,7 +362,8 @@
   line-height: 1;
 }
 
-.mark-complete-btn {
+.mark-complete-btn,
+.call-next-btn {
   background: #1cc88a;
   color: white;
   border: none;
@@ -348,11 +375,17 @@
   transition: opacity 0.2s;
 }
 
-.mark-complete-btn:hover {
+.call-next-btn {
+  background: #4e73df;
+}
+
+.mark-complete-btn:hover,
+.call-next-btn:hover {
   opacity: 0.9;
 }
 
-.mark-complete-btn:disabled {
+.mark-complete-btn:disabled,
+.call-next-btn:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
 }
@@ -494,7 +527,7 @@
 .block-column {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 15px; /* Increased from 10px for better vertical rhythm */
 }
 
 .block-column:first-child {
@@ -511,7 +544,7 @@
   font-weight: 800;
   color: #b7b9cc;
   text-transform: uppercase;
-  margin-bottom: 20px;
+  margin-bottom: 10px; /* Reduced from 20px to align better with gap */
   letter-spacing: 0.05rem;
   white-space: nowrap;
 }
@@ -522,14 +555,14 @@
   font-weight: 700;
   color: #5a5c69;
   margin: 0;
-  height: 38px;
+  height: 40px; /* Standardized height */
   display: flex;
   align-items: center;
 }
 
 .cater-btn,
 .cater-again-btn {
-  height: 38px;
+  height: 40px; /* Standardized height */
   padding: 0 20px;
   border-radius: 5px;
   border: none;
@@ -543,6 +576,7 @@
 .cater-btn {
   background-color: #4e73df;
   color: white;
+  flex: 1;
 }
 
 .cater-again-btn {
@@ -551,16 +585,43 @@
   flex: 1;
 }
 
-.skipped-actions-row {
+.skipped-actions-row,
+.waiting-actions-row {
   display: flex;
   gap: 10px;
   align-items: center;
-  margin: 10px 0;
+  margin: 0; /* Removed margin to fix alignment */
+  height: 40px; /* Match number height */
+}
+
+.serving-actions-secondary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.action-divider {
+  color: #eaecf4;
+  font-size: 0.8rem;
+}
+
+.cancel-link-btn {
+  color: #858796;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.cancel-link-btn:hover {
+  color: #e74a3b;
 }
 
 .cancel-btn {
-  width: 38px;
-  height: 38px;
+  width: 40px; /* Standardized size */
+  height: 40px; /* Standardized size */
   border-radius: 5px;
   border: none;
   background-color: #e74a3b;
