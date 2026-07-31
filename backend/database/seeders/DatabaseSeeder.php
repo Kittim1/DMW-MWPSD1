@@ -20,8 +20,8 @@ class DatabaseSeeder extends Seeder
             'role' => 'superadmin',
         ]);
 
-        // Create 5 Counter Users and Counters
-        for ($i = 1; $i <= 5; $i++) {
+        // Create 8 Counter Users and Counters
+        for ($i = 1; $i <= 8; $i++) {
             $user = User::create([
                 'name' => "Counter {$i} User",
                 'email' => "counter{$i}@dmw.com",
@@ -36,15 +36,28 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        // Create sample tickets
-        $priorityNumbers = ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010'];
-        
-        foreach ($priorityNumbers as $index => $number) {
-            Ticket::create([
-                'priority_number' => $number,
-                'status' => $index < 2 ? 'serving' : 'waiting',
-                'counter_id' => $index < 2 ? ($index + 1) : null,
-                'called_at' => $index < 2 ? now() : null,
+        // Create Guard User
+        User::create([
+            'name' => 'Guard User',
+            'email' => 'guard@dmw.com',
+            'password' => Hash::make('password'),
+            'role' => 'guard',
+        ]);
+
+        // Create default services
+        $services = [
+            'Overseas Employment Certificate',
+            'Information Sheet',
+            'Account Retrieval',
+            'PEOS',
+            'Balik Manggagawa',
+            'Direct Hire',
+            'G to G',
+        ];
+
+        foreach ($services as $service) {
+            \App\Models\Service::create([
+                'name' => $service,
             ]);
         }
     }

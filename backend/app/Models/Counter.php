@@ -12,10 +12,12 @@ class Counter extends Model
         'user_id',
         'is_active',
         'current_ticket_id',
+        'max_concurrent',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'max_concurrent' => 'integer',
     ];
 
     public function user()

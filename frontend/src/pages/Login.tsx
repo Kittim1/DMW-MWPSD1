@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { useLoadingOverlay } from "../contexts/LoadingOverlayContext";
 import { authService } from "../services/api";
 import "./Login.css";
 
@@ -14,11 +15,27 @@ function Login({ setIsAuthenticated }: LoginProps) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { showLoading, hideLoading } = useLoadingOverlay();
+
+  const showRef = useRef(showLoading);
+  const hideRef = useRef(hideLoading);
+
+  useEffect(() => {
+    showRef.current = showLoading;
+    hideRef.current = hideLoading;
+  });
+
+  useEffect(() => {
+    showRef.current("", 150);
+    const t = window.setTimeout(() => hideRef.current(), 180);
+    return () => window.clearTimeout(t);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
+    showRef.current("", 400);
 
     try {
       const response = await authService.login(email, password);
@@ -30,7 +47,14 @@ function Login({ setIsAuthenticated }: LoginProps) {
       console.log("Login successful:", response.data.user);
       setIsAuthenticated(true);
       toast.success(`Welcome back, ${response.data.user.name}!`);
-      navigate("/dashboard");
+      const userRole = response.data.user.role;
+      if (userRole === "guard") {
+        navigate("/guard");
+      } else if (userRole === "counter") {
+        navigate(`/counter/${response.data.user.counter_id || 1}`);
+      } else {
+        navigate("/dashboard");
+      }
     } catch (err: any) {
       const errorMessage =
         err.response?.data?.message || "Login failed. Please try again.";
@@ -39,7 +63,16 @@ function Login({ setIsAuthenticated }: LoginProps) {
       toast.error(errorMessage);
     } finally {
       setLoading(false);
+      hideRef.current();
     }
+  };
+
+  const handleBack = () => {
+    showRef.current("", 150);
+    setTimeout(() => {
+      navigate("/");
+      setTimeout(() => hideRef.current(), 40);
+    }, 120);
   };
 
   return (
@@ -47,7 +80,7 @@ function Login({ setIsAuthenticated }: LoginProps) {
       <div className="login-card">
         <button
           className="back-btn"
-          onClick={() => navigate("/")}
+          onClick={handleBack}
           aria-label="Go back"
         ></button>
         <h1>DMW Processing</h1>
@@ -69,7 +102,6 @@ function Login({ setIsAuthenticated }: LoginProps) {
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">Password</label>
             <input
               id="password"
               type="password"
@@ -91,6 +123,7 @@ function Login({ setIsAuthenticated }: LoginProps) {
           </p>
           <p>SuperAdmin: admin@dmw.com / password</p>
           <p>Counter: counter1@dmw.com / password</p>
+          <p>Guard: guard@dmw.com / password</p>
         </div>
       </div>
     </div>

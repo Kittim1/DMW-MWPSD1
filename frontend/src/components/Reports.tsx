@@ -42,6 +42,13 @@ function Reports() {
             Daily
           </button>
           <button
+            className={`tab-btn ${reportType === "weekly" ? "active" : ""}`}
+            onClick={() => setReportType("weekly")}
+            disabled={loading}
+          >
+            Weekly
+          </button>
+          <button
             className={`tab-btn ${reportType === "monthly" ? "active" : ""}`}
             onClick={() => setReportType("monthly")}
             disabled={loading}

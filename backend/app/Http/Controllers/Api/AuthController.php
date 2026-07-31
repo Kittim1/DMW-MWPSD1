@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Counter;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -28,7 +29,22 @@ class AuthController extends Controller
         $counter_id = null;
         if ($user->isCounter()) {
             $counter = $user->counter()->first();
-            $counter_id = $counter?->id;
+            if ($counter) {
+                $counter_id = $counter->id;
+            } else {
+                // Fallback for Counter 5 which can have 2 concurrent staff (dual user logins).
+                // If the user is a counter role but has no direct counter.user_id assignment,
+                // assign them to Counter 5 when its max_concurrent capacity allows multiple slots.
+                $counter5 = Counter::where('id', 5)
+                    ->where(function ($q) {
+                        $q->where('max_concurrent', '>=', 2)
+                          ->orWhereNull('max_concurrent');
+                    })
+                    ->first();
+                if ($counter5) {
+                    $counter_id = 5;
+                }
+            }
         }
 
         $userData = $user->toArray();

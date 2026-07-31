@@ -5,6 +5,13 @@
     <link rel="icon" type="image/png" href="/dmw.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DMW Processing - Queue Management System</title>
+    <script>
+      // Apply dark mode on initial load
+      const darkMode = localStorage.getItem('darkMode');
+      if (darkMode === 'true') {
+        document.documentElement.classList.add('dark');
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -13,6 +13,10 @@ interface QueueItem {
   priority_number: string;
   status: string;
   counter_id?: number;
+  service_type?: string;
+  services?: string[];
+  is_priority?: boolean;
+  priority_type?: string;
 }
 
 function CounterPanel({ userId }: CounterPanelProps) {
@@ -20,6 +24,7 @@ function CounterPanel({ userId }: CounterPanelProps) {
   const [waitingTickets, setWaitingTickets] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [counterId, setCounterId] = useState<number | null>(null);
+  const [maxConcurrent, setMaxConcurrent] = useState<number>(1);
 
   // Fetch counter ID on mount
   useEffect(() => {
@@ -27,17 +32,29 @@ function CounterPanel({ userId }: CounterPanelProps) {
       try {
         const countersRes = await counterService.getCounters();
         const counters = countersRes.data || [];
-        // Find the counter assigned to this user
-        const userCounter = counters.find((c: any) => c.user_id === userId);
+        // First try: exact match by user_id. Then for Counter 5 which can
+        // have 2 staff, we also fall back to picking a Counter 5 record if
+        // the user is not already linked.
+        let userCounter = counters.find((c: any) => c.user_id === userId);
+        if (!userCounter) {
+          const counter5 = counters.find(
+            (c: any) => c.id === 5 && (c.max_concurrent ?? 1) >= 2,
+          );
+          if (counter5) {
+            userCounter = counter5;
+          }
+        }
         if (userCounter) {
           setCounterId(userCounter.id);
+          setMaxConcurrent(userCounter.max_concurrent ?? 1);
         } else {
-          // Fallback: use first counter or userId
           setCounterId(userId);
+          setMaxConcurrent(1);
         }
       } catch (error) {
         console.error("Failed to fetch counter:", error);
         setCounterId(userId); // fallback
+        setMaxConcurrent(1);
       }
     };
 
@@ -62,13 +79,14 @@ function CounterPanel({ userId }: CounterPanelProps) {
     return () => clearInterval(interval);
   }, [counterId]);
 
-  // Find the ticket currently being served by THIS counter
-  const currentlyServingTicket = servingTickets.find(
+  // All tickets currently being served by THIS counter (supports multiple for Counter 5)
+  const currentlyServingTickets = servingTickets.filter(
     (t) => t.counter_id === counterId,
   );
 
-  // Flag: is this counter currently serving someone?
-  const isServing = !!currentlyServingTicket;
+  // Flag: counter is at capacity (used to disable "Call Next" button)
+  const atCapacity =
+    currentlyServingTickets.length >= Math.max(1, maxConcurrent);
 
   const handleCallNext = async () => {
     if (!counterId) return;
@@ -76,19 +94,20 @@ function CounterPanel({ userId }: CounterPanelProps) {
     try {
       await queueService.callNext(counterId);
       await fetchQueue();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to call next:", error);
+      alert(error?.response?.data?.message || "Failed to call next ticket");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleMarkCompleted = async () => {
-    if (!currentlyServingTicket) return;
+  const handleMarkCompleted = async (ticketId: number) => {
+    if (!ticketId) return;
 
     setLoading(true);
     try {
-      await queueService.completeService(currentlyServingTicket.ticket_id);
+      await queueService.completeService(ticketId);
       await fetchQueue();
     } catch (error) {
       console.error("Failed to mark complete:", error);
@@ -106,8 +125,18 @@ function CounterPanel({ userId }: CounterPanelProps) {
           {servingTickets.length > 0 ? (
             <div className="tickets-grid">
               {servingTickets.map((ticket) => (
-                <div key={ticket.id} className="ticket-pair">
-                  <div className="ticket-number">{ticket.priority_number}</div>
+                <div
+                  key={ticket.id}
+                  className={`ticket-pair ${ticket.is_priority ? "priority" : ""}`}
+                >
+                  <div
+                    className={`ticket-number ${ticket.is_priority ? "priority-text" : ""}`}
+                  >
+                    {ticket.priority_number}
+                  </div>
+                  <div className="counter-assignment">
+                    {(ticket.services || [ticket.service_type]).join(", ")}
+                  </div>
                   <div className="counter-assignment">
                     COUNTER {ticket.counter_id || "-"}
                   </div>
@@ -121,16 +150,43 @@ function CounterPanel({ userId }: CounterPanelProps) {
       </section>
 
       {/* ── You Are Serving (This Counter) ── */}
-      {currentlyServingTicket && (
-        <section className="panel-card you-are-serving-card">
-          <h2 className="panel-title">YOU ARE SERVING</h2>
+      {currentlyServingTickets.map((servingTicket) => (
+        <section
+          key={`you-are-serving-${servingTicket.id}`}
+          className={`panel-card you-are-serving-card ${servingTicket.is_priority ? "priority" : ""}`}
+        >
+          <h2 className="panel-title">
+            YOU ARE SERVING
+            {currentlyServingTickets.length > 1 && (
+              <span className="serving-slot">
+                {" "}
+                ({currentlyServingTickets.indexOf(servingTicket) + 1}/
+                {currentlyServingTickets.length}
+              </span>
+            )}
+          </h2>
           <div className="serving-ticket-box">
-            <div className="serving-ticket-display">
-              <div className="serving-ticket-number">
-                {currentlyServingTicket.priority_number}
+            <div
+              className={`serving-ticket-display ${servingTicket.is_priority ? "priority" : ""}`}
+            >
+              <div
+                className={`serving-ticket-number ${servingTicket.is_priority ? "priority-text" : ""}`}
+              >
+                {servingTicket.priority_number}
+              </div>
+              <div className="counter-assignment">
+                {(servingTicket.services || [servingTicket.service_type]).join(
+                  ", ",
+                )}
+                {servingTicket.is_priority && servingTicket.priority_type && (
+                  <span className="priority-tag">
+                    {" "}
+                    ⚑ {servingTicket.priority_type}
+                  </span>
+                )}
               </div>
               <button
-                onClick={handleMarkCompleted}
+                onClick={() => handleMarkCompleted(servingTicket.ticket_id)}
                 disabled={loading}
                 className="mark-completed-button"
               >
@@ -139,7 +195,7 @@ function CounterPanel({ userId }: CounterPanelProps) {
             </div>
           </div>
         </section>
-      )}
+      ))}
 
       {/* ── Dashboard ── */}
       <section className="panel-card">
@@ -152,8 +208,14 @@ function CounterPanel({ userId }: CounterPanelProps) {
             <div className="not-catered-list">
               {waitingTickets.length > 0 ? (
                 waitingTickets.map((ticket) => (
-                  <div key={ticket.id} className="waiting-ticket">
-                    {ticket.priority_number}
+                  <div
+                    key={ticket.id}
+                    className={`waiting-ticket ${ticket.is_priority ? "priority" : ""}`}
+                  >
+                    <span>{ticket.priority_number}</span>
+                    {ticket.is_priority && (
+                      <span className="priority-badge">⚑ PRIORITY</span>
+                    )}
                   </div>
                 ))
               ) : (
@@ -166,25 +228,25 @@ function CounterPanel({ userId }: CounterPanelProps) {
           <div className="actions-column">
             <h3 className="column-title">ACTIONS</h3>
             <div className="actions-list">
-              {!isServing && waitingTickets.length > 0 ? (
+              {!atCapacity && waitingTickets.length > 0 ? (
                 waitingTickets.map((ticket) => (
                   <button
                     key={ticket.id}
                     onClick={handleCallNext}
-                    disabled={loading || isServing}
+                    disabled={loading || atCapacity}
                     className="cater-button"
                     title={
-                      isServing
-                        ? "Complete current ticket first"
+                      atCapacity
+                        ? `Already serving ${currentlyServingTickets.length}/${maxConcurrent}`
                         : "Call next ticket"
                     }
                   >
                     CATER
                   </button>
                 ))
-              ) : isServing ? (
+              ) : atCapacity ? (
                 <div className="serving-message">
-                  Serving ticket {currentlyServingTicket?.priority_number}
+                  Serving {currentlyServingTickets.length}/{maxConcurrent} slots
                 </div>
               ) : (
                 <div className="empty-waiting">—</div>

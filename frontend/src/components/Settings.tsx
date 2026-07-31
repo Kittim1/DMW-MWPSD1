@@ -21,6 +21,9 @@ function Settings({ user, onUserUpdate }: SettingsProps) {
     password_confirmation: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem("darkMode") === "true";
+  });
 
   useEffect(() => {
     if (user) {
@@ -31,6 +34,15 @@ function Settings({ user, onUserUpdate }: SettingsProps) {
       }));
     }
   }, [user]);
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    localStorage.setItem("darkMode", String(isDarkMode));
+  }, [isDarkMode]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -79,6 +91,19 @@ function Settings({ user, onUserUpdate }: SettingsProps) {
             <p>Manage your account information and password.</p>
           </div>
           
+          <div className="dark-mode-toggle">
+            <div className="toggle-label">
+              <span>Dark Mode</span>
+              <span>{isDarkMode ? "On" : "Off"}</span>
+            </div>
+            <button
+              className={`toggle-btn ${isDarkMode ? "active" : ""}`}
+              onClick={() => setIsDarkMode(!isDarkMode)}
+            >
+              <div className="toggle-slider"></div>
+            </button>
+          </div>
+
           <form className="settings-form" onSubmit={handleSubmit}>
             <div className="form-group">
               <label>Full Name</label>

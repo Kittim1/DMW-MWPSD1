@@ -1,114 +1,510 @@
-.landing-container {
-  padding: 10px 20px;
-  background-color: #f5f5f5;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-sizing: border-box;
+:root {
+  --dmw-blue: #002b5c;
+  --dmw-red: #ff0000;
+  --dmw-yellow: #ffff00;
+  --dmw-dark: #1a1a1a;
+  --border-gray: #555555;
 }
 
-.landing-header {
-  background: linear-gradient(135deg, #fafafa 0%, #f5f3f7 100%);
-  color: rgb(8, 8, 8);
-  padding: 8px 15px; /* Reduced padding */
-  text-align: center;
-  margin-bottom: 10px; /* Reduced margin */
-  border-radius: 8px;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex-shrink: 0;
+#landing-page * {
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
-.header-top {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  gap: 15px; /* Reduced gap */
-  margin-bottom: 2px; /* Reduced margin */
+#landing-page {
+  font-family: "Arial Black", Arial, "Segoe UI", Tahoma, sans-serif !important;
+  background-color: #ffffff !important;
+  color: var(--dmw-dark) !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  flex-wrap: nowrap !important;
+  border: none !important;
+  outline: none !important;
 }
 
-.dmw-logo {
-  height: 60px; /* Reduced logo size from 80px */
-  width: auto;
-  object-fit: contain;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
-  flex-shrink: 0;
+/* ========== HEADER (14vh) ========== */
+#landing-page .landing-header {
+  background-color: var(--dmw-blue) !important;
+  width: 100% !important;
+  flex: 0 0 14vh !important;
+  padding: 1vh 1.6vw !important;
+  display: flex !important;
+  align-items: center !important;
+  border: none !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
 }
 
-.landing-header h1 {
-  font-size: 24px; /* Reduced from 28px */
-  margin: 0;
-  flex: 1;
+#landing-page .header-content {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 1.2vw !important;
+  width: 100% !important;
+  height: 100% !important;
 }
 
-.landing-header h2 {
-  margin: 2px 0;
-  font-size: 16px; /* Reduced from 18px */
+#landing-page .dmw-logo {
+  height: 11vh !important;
+  width: auto !important;
+  flex-shrink: 0 !important;
+  max-width: 9vw !important;
 }
 
-.landing-header p {
-  font-size: 13px; /* Reduced from 14px */
-  opacity: 0.9;
-  margin: 1px 0;
+#landing-page .header-text {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  color: #ffffff !important;
+  height: 100% !important;
 }
 
-.queue-display-container {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  max-width: 100%;
-  margin: 0;
-  text-align: center;
-  flex: 1;
-  min-height: 0; /* Important for flex child to be able to shrink */
+#landing-page .header-text h1 {
+  font-size: 3.2vh !important;
+  font-weight: 900 !important;
+  margin-bottom: 0.3vh !important;
+  letter-spacing: 0.08vw !important;
+  color: #ffffff !important;
+  opacity: 1 !important;
+  line-height: 1.15 !important;
 }
 
-.loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  font-size: 24px;
-  color: #667eea;
+#landing-page .header-text h2 {
+  font-size: 2.5vh !important;
+  font-weight: 700 !important;
+  margin-bottom: 0.15vh !important;
+  letter-spacing: 0.05vw !important;
+  color: #ffffff !important;
+  opacity: 1 !important;
+  line-height: 1.15 !important;
+}
+
+#landing-page .time-date {
+  font-size: 1.9vh !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  margin-top: 0.4vh !important;
+  margin-bottom: 0.3vh !important;
+  color: #ffcb16 !important;
+  /* #162ca7 -- old color*/
+  opacity: 1 !important;
+}
+
+#landing-page .session-info {
+  font-size: 2.9vh !important;
+  font-weight: 900 !important;
+  color: var(--dmw-white) !important;
+  line-height: 1.1 !important;
+  opacity: 1 !important;
+  text-align: center !important;
+}
+
+#landing-page .login-icon-btn {
+  background-color: #ffffff !important;
+  border: 0.25vh solid #000000 !important;
+  width: 8.5vh !important;
+  height: 8.5vh !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  flex-shrink: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#landing-page .login-icon-btn svg {
+  width: 6.5vh !important;
+  height: 6.5vh !important;
+}
+
+#landing-page .login-icon-btn:active {
+  background-color: #eeeeee !important;
+}
+
+/* ========== SECTION TITLE (plain text, NO FRAME/BORDER around it) ========== */
+#landing-page .section-title {
+  font-size: 3.1vh !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+  margin: 0 auto 0.7vh auto !important;
+  color: #1a1a1a !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.2vw !important;
+  opacity: 1 !important;
+  line-height: 1.2 !important;
+  flex-shrink: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* ========== CATERED SECTION (26vh) — NO OUTER BORDER/FAME around this section at all
+   (outer border = screen edge per user). Border only on the 5 INDIVIDUAL counter cards. ========== */
+#landing-page .catered-section {
+  border: none !important;
+  background-color: #ffffff !important;
+  flex: 0 0 26vh !important;
+  margin: 0.8vh 1.5vw 0.4vh 1.5vw !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+#landing-page .catered-counters {
+  display: grid !important;
+  grid-template-columns: repeat(6, 1fr) !important;
+  gap: 1vh 1vw !important;
+  padding: 0 !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+
+/* Individual catered counter CARDS have the border (NOT the section) */
+#landing-page .catered-counter {
+  border: 0.35vh solid var(--border-gray) !important;
+  background-color: #ffffff !important;
+  padding: 0.8vh 0.4vw !important;
+  text-align: center !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: space-around !important;
+  gap: 0.3vh !important;
+  min-height: 0 !important;
+  height: 100% !important;
+}
+
+#landing-page .service-label-top {
+  font-size: 2.5vh !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+  color: #1a1a1a !important;
+  letter-spacing: 0.05vw !important;
+  opacity: 1 !important;
+  line-height: 1.05 !important;
+}
+
+#landing-page .counter-number {
+  font-size: 5.2vh !important;
+  font-weight: 900 !important;
+  color: var(--dmw-red) !important;
+  line-height: 1 !important;
+  opacity: 1 !important;
+}
+
+#landing-page .counter-name {
+  font-size: 3vh !important;
+  font-weight: 900 !important;
+  color: #1a1a1a !important;
+  text-transform: uppercase !important;
+  opacity: 1 !important;
+  line-height: 1.05 !important;
+}
+
+/* ---- Priority = RED styling on catered counter cards ---- */
+#landing-page .catered-counter.priority {
+  background-color: #fff5f5 !important;
+  border: 0.35vh solid #c53030 !important;
+  box-shadow:
+    0 0 0 0.15vh #feb2b2 inset,
+    0 0.4vh 0.8vh rgba(197, 48, 48, 0.25) !important;
+}
+#landing-page .catered-counter.priority .service-label-top {
+  color: #742a2a !important;
+}
+#landing-page .counter-number.priority {
+  color: #9b2c2c !important;
+  text-shadow: 0 0 0.3vh rgba(229, 62, 62, 0.35) !important;
+}
+#landing-page .catered-counter.priority .counter-name {
+  color: #742a2a !important;
+}
+
+/* ---- Priority = RED styling on waiting cards ---- */
+#landing-page .waiting-ticket.priority {
+  background-color: #fff5f5 !important;
+  border: 0.35vh solid #c53030 !important;
+  color: #9b2c2c !important;
+  box-shadow: 0 0.3vh 0.7vh rgba(197, 48, 48, 0.22) !important;
+}
+
+/* ========== WAITING SECTION (flex: auto to fill remaining space) — NO OUTER BORDER/FRAME (screen edge is the border).
+   Individual ticket CARDS have the border. Grows to fill space when skipped section is hidden. ========== */
+#landing-page .waiting-section {
+  border: none !important;
+  background-color: #ffffff !important;
+  flex: 1 1 auto !important;
+  margin: 0.4vh 1.5vw !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  box-shadow: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  min-height: 40vh !important;
+}
+
+#landing-page .waiting-cards-wrap {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+  align-content: flex-start !important;
+  gap: 1.5vh 1.5vw !important;
+  padding: 0.5vh 0.5vw !important;
+  flex: 1 1 auto !important;
+  overflow: hidden !important;
+  min-height: 0 !important;
+}
+
+/* Individual waiting TICKET cards have the border (NOT the section) */
+#landing-page .waiting-ticket {
+  border: 0.35vh solid var(--border-gray) !important;
+  background-color: #ffffff !important;
+  padding: 2.2vh 2vw !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  font-size: 2.6vh !important;
+  font-weight: 900 !important;
+  color: #1a1a1a !important;
+  opacity: 1 !important;
+  width: auto !important;
+  min-width: 18vw !important;
+  max-width: 22vw !important;
+  height: auto !important;
+  min-height: 7vh !important;
+  flex: 0 0 auto !important;
+  line-height: 1 !important;
+}
+
+/* ========== SKIPPED SECTION (10vh) — NO OUTER BORDER/FRAME (screen edge is the border).
+   Individual ticket CARDS have the border. ========== */
+#landing-page .skipped-section {
+  border: none !important;
+  background-color: #ffffff !important;
+  flex: 0 0 10vh !important;
+  overflow: hidden !important;
+  margin: 0.4vh 1.5vw 1vh 1.5vw !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+}
+
+#landing-page .skipped-cards-wrap {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  align-content: center !important;
+  gap: 1vh 1.2vw !important;
+  padding: 0.2vh 0.5vw !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Individual skipped TICKET cards have the border (NOT the section) */
+#landing-page .skipped-ticket {
+  border: 0.35vh solid var(--border-gray) !important;
+  background-color: #ffffff !important;
+  padding: 1.2vh 1.3vw !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  font-size: 2.1vh !important;
+  font-weight: 900 !important;
+  color: #1a1a1a !important;
+  opacity: 1 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  min-width: 10vw !important;
+  max-width: 14vw !important;
+  width: auto !important;
+  flex: 0 0 auto !important;
+  line-height: 1 !important;
+}
+
+/* ========== LOADING ========== */
+#landing-page .loading {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 100vh !important;
+  font-size: 4vh !important;
+  color: var(--dmw-blue) !important;
+  font-weight: 900 !important;
+}
+
+/* ========== WATERMARK BACKGROUND (below header, behind all content) ========== */
+#landing-page .landing-watermark {
+  position: absolute !important;
+  top: 14vh !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  z-index: 0 !important;
+  overflow: hidden !important;
+}
+
+#landing-page .landing-watermark .watermark-seal {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  max-width: 62vh !important;
+  max-height: 62vh !important;
+  width: auto !important;
+  height: auto !important;
+  opacity: 0.14 !important;
+  object-fit: contain !important;
+}
+
+#landing-page .landing-watermark .watermark-ring {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 78vh !important;
+  height: 78vh !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  pointer-events: none !important;
+  opacity: 0.22 !important;
+}
+
+/* Raise the sections (cards/text) to render ABOVE the watermark */
+#landing-page .catered-section,
+#landing-page .waiting-section,
+#landing-page .skipped-section {
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+/* ========== VERTICAL TOTALS (waiting uses flex:auto to fill remaining space):
+   14 header + 26 catered + (waiting flex:auto fills) + 10 skipped(if present) + margins
+   Total approx 98.5vh when skipped shown; waiting grows to fill ~54vh when skipped hidden
+========== */
+
+/* ========== MEDIA QUERIES ========== */
+@media (max-width: 1280px) {
+  #landing-page .waiting-ticket {
+    font-size: 2.3vh !important;
+    min-width: 19vw !important;
+    padding: 2vh 1.5vw !important;
+  }
+  #landing-page .skipped-ticket {
+    font-size: 1.9vh !important;
+  }
+  #landing-page .counter-number {
+    font-size: 4.6vh !important;
+  }
+  #landing-page .service-label-top {
+    font-size: 2.2vh !important;
+  }
+  #landing-page .counter-name {
+    font-size: 2.7vh !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  #landing-page .header-content {
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 0.8vw !important;
+  }
+  #landing-page .catered-section,
+  #landing-page .waiting-section,
+  #landing-page .skipped-section {
+    margin-left: 1vw !important;
+    margin-right: 1vw !important;
+  }
+  #landing-page .waiting-ticket {
+    font-size: 2.1vh !important;
+    min-width: 28vw !important;
+    max-width: 32vw !important;
+    padding: 1.8vh 1.5vw !important;
+  }
+  #landing-page .waiting-cards-wrap {
+    gap: 1.2vh 1vw !important;
+    padding: 0.5vh 0.4vw !important;
+  }
+  #landing-page .skipped-ticket {
+    font-size: 1.8vh !important;
+    min-width: 13vw !important;
+  }
+  #landing-page .counter-number {
+    font-size: 4vh !important;
+  }
+  #landing-page .service-label-top {
+    font-size: 2vh !important;
+  }
+  #landing-page .counter-name {
+    font-size: 2.4vh !important;
+  }
 }
 
 @media (max-width: 768px) {
-  .queue-display-container {
-    grid-template-columns: 1fr;
+  #landing-page .catered-section {
+    flex: 0 0 24vh !important;
   }
-
-  .landing-header h1 {
-    font-size: 24px;
+  #landing-page .waiting-section {
+    min-height: 38vh !important;
   }
-}
-.login-icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 50%;
-  color: black;
-  transition:
-    background-color 0.2s ease,
-    opacity 0.2s ease;
-  flex-shrink: 0;
-  width: 64px;
-  height: 64px;
-}
-
-.login-icon-btn:hover {
-  background-color: rgba(5, 5, 5, 0.15);
-  opacity: 0.85;
-}
-
-.login-icon-btn:active {
-  opacity: 0.7;
+  #landing-page .dmw-logo {
+    height: 9vh !important;
+    max-width: 12vw !important;
+  }
+  #landing-page .waiting-ticket {
+    font-size: 1.9vh !important;
+    min-width: 40vw !important;
+    max-width: 46vw !important;
+    padding: 1.6vh 1.5vw !important;
+  }
+  #landing-page .waiting-cards-wrap {
+    gap: 1vh 1.5vw !important;
+    padding: 0.3vh 0.3vw !important;
+  }
+  #landing-page .skipped-cards-wrap {
+    gap: 0.8vh 1vw !important;
+  }
+  #landing-page .skipped-ticket {
+    font-size: 1.7vh !important;
+    min-width: 18vw !important;
+  }
+  #landing-page .counter-number {
+    font-size: 3.5vh !important;
+  }
+  #landing-page .service-label-top {
+    font-size: 1.8vh !important;
+  }
+  #landing-page .counter-name {
+    font-size: 2.2vh !important;
+  }
+  #landing-page .section-title {
+    font-size: 2.6vh !important;
+  }
 }

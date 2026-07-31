@@ -1,0 +1,289 @@
+===============================================================================
+GUARD DASHBOARD REDESIGN — IMPLEMENTATION TASKS
+Based on 5 mockup images provided (Main dashboard + 4 service modals)
+===============================================================================
+
+OVERVIEW
+--------
+The current Guard page (8 service checkboxes + priority section + name/time
+fields + 3 basic modals) will be completely replaced with a new Windows-98
+bevel-styled layout that matches the DMW Counter Dashboard, with 5 large
+yellow service tiles and 5 dedicated decision-flow modals.
+
+===============================================================================
+TASK 1 — REPLACE THE MAIN LAYOUT STRUCTURE (Guard.tsx shell + sidebar)
+===============================================================================
+1.1. Change outer container to 100vh fixed layout with overflow:hidden
+     (consistent with Counter Dashboard / DMW ROX MWPSD convention)
+1.2. Replace existing simple header bar with the new DMW-branded header:
+       - Upper left:  DMW seal (dmw.png) + 3-line header block
+                      "Republic of the Philippines"
+                      "DEPARTMENT OF MIGRANT WORKERS"
+                      "Regional Office X"
+       - Upper right: "hello, Guard" salutation + user/guard icon
+1.3. Add the "DMW ROX / MWPSD" LEFT SIDEBAR (matching Counter dashboard style):
+       - Light-blue gradient background
+       - "DMW ROX" + "MWPSD" heading labels (NOT buttons — static text)
+       - Button: "DASHBOARD"  — Windows 98 bevel style, raised, active view
+       - Button: "SETTINGS"   — same bevel style, inactive for now
+       - Button: "LOGOUT"     — red bevel button pinned to sidebar bottom
+1.4. Add WATERMARK background on the inner page area:
+       - Large semi-transparent DMW seal (28% opacity, matches counter dash)
+       - Diagonal repeating "DEPARTMENT OF MIGRANT WORKERS" +
+         "REPUBLIC OF THE PHILIPPINES" text pattern rendered as faded overlay
+1.5. Move existing role-check useEffect (guard / superadmin / counter redirect)
+     to the new structure — behavior unchanged.
+1.6. Add the loading overlay ref-safety pattern (useRef for show/hideLoading
+     + useEffect sync) even though Guard only uses usePageLoading today.
+
+===============================================================================
+TASK 2 — REPLACE THE SERVICE SELECTION AREA (main content card)
+===============================================================================
+2.1. Remove the old SERVICE_TYPES constant. Replace with the 5 services
+     visible in the mockup, in this exact order, with exactly these names:
+        1. BALIK MANGAGAWA     (row 1 col 1)
+        2. DIRECT HIRE         (row 1 col 2)
+        3. G TO G              (row 1 col 3)
+        4. HELP DESK           (row 2 col 1)
+        5. INFORMATION SHEET   (row 2 col 2)
+     Row 2 column 3 is intentionally empty.
+2.2. Layout: main white rounded-corner card (20-24px radius, bordered)
+     centered inside the non-sidebar area, with the title "SELECT SERVICES"
+     (note mockup had typo "SELEC" — use correct spelling).
+2.3. Replace the small multi-select toggle buttons with LARGE YELLOW
+     Windows-98 style bevel tiles:
+       - Yellow gradient fill (lighter center, darker edges)
+       - Dark outer shadow/bevel border (3D button look)
+       - All caps labels inside ("BALIK MANGAGAWA" etc)
+       - Selected state: visibly pressed/sunken bevel + colored checkmark
+         or highlight border so the guard can see which services are chosen
+         before pressing Generate Ticket.
+2.4. Selection rules: clicking a tile toggles it ON/OFF (multi-select still
+     supported), keep the 7-service max warning from before but note that
+     with only 5 tiles the max will effectively never trigger — keep the
+     check anyway for safety.
+2.5. Remove the ENTIRE priority section (checkboxes + PWD/Senior/etc grid +
+     "Other" free-text box + priority toggle label) because NONE of the
+     mockups show a priority area. If users need priority they will ask to
+     add it later in a follow-up revision.
+2.6. Remove the client_name / scheduled_day / scheduled_time fields.
+     Appointment info is now captured inside the Direct Hire / Balik
+     Manggagawa decision-flow modals as simple YES/NO or choice selections.
+2.7. Keep existing helpDeskTypes state array (reused inside new Help Desk
+     modal for multi-select of Inquiry/PEOS/Account Retrieval/OEC).
+
+===============================================================================
+TASK 3 — ADD THE "GENERATE TICKET" CTA BUTTON
+===============================================================================
+3.1. Place a LARGE green bevel button "GENERATE TICKET" at the BOTTOM CENTER
+     of the main services card — matching the exact size/style from the
+     Counter dashboard's "MARK AS COMPLETE" solid-green 3D bevel pattern.
+3.2. Button state:
+       - Disabled (grayed out / flat) when 0 services selected OR loading
+       - Enabled green 3D look when 1+ services selected AND not loading
+       - Label changes to "GENERATING..." (spinner / text) while loading
+3.3. Reuse the existing handleGenerateTicket logic but simplify the payload
+     sent to queueService.addTicket since we removed fields:
+       - keep service_names, helpdesk_type, is_priority, priority_type
+       - keep has_appointment (now populated from modal answers instead of
+         from the shared appointment checkbox)
+       - remove client_name / scheduled_day / scheduled_time from the
+         default payload (they were never shown in any mockup); if the
+         backend requires them pass empty strings
+
+===============================================================================
+TASK 4 — BUILD THE BALIK MANGAGAWA MODAL (mockup image 4)
+===============================================================================
+4.1. Create the dedicated BalikManggagawa modal state. Show it ONLY when
+     the Balik Manggagawa tile is clicked/toggled ON. (It replaces the old
+     "showAppointmentModal" single-question modal that was shared.)
+4.2. Title (top center, all caps or large label):
+     "BALIK MANGAGAWA MODAL" -> body question:  "Do you have an Appointment?"
+4.3. Two large buttons, centered side-by-side:
+       - YES  — dark navy-blue bevel button, white bold all-caps text
+       - NO   — bright red bevel button, white bold all-caps text
+4.4. Actions:
+       - YES  → set hasAppointment = true  -> close modal
+       - NO   → set hasAppointment = false -> close modal
+4.5. Clicking backdrop (outside the modal) = closes but WITHOUT changing
+     hasAppointment state from its previous value.
+4.6. Style: rounded white modal card on a semi-transparent gray overlay —
+     same overlay base as other project modals, but specifically sized for
+     YES/NO side-by-side.
+
+===============================================================================
+TASK 5 — BUILD THE DIRECT HIRE 2-STEP FLOW (mockup image 2, 3 boxes)
+===============================================================================
+Direct Hire has a 2-STEP conditional flow, not a single modal.
+Add a state variable tracking the current Direct Hire step:
+   'q1' (default) | 'q2-appointment' (from YES) | 'q2-select' (from NO)
+
+5.1. STEP 1 — "Did you already start with this employer?"
+       - 2 buttons: YES (dark navy) / NO (red) — same style as Balik above
+       - YES → advance to step 'q2-appointment' (keep modal open, swap body)
+       - NO  → advance to step 'q2-select'      (swap body)
+
+5.2. STEP 2A (from YES) — "Do you have an Appointment?"
+       - YES (navy) / NO (red) again
+       - YES → set hasAppointment = true  -> close modal fully
+       - NO  → set hasAppointment = false -> close modal fully
+
+5.3. STEP 2B (from NO) — "SELECT ONE"
+       - Two blue bevel buttons stacked vertically:
+            INQUIRY        (top)
+            APPOINTMENT    (bottom)
+       - Click INQUIRY     → hasAppointment = false, set directHire subtype
+                            or equivalent note -> close modal
+       - Click APPOINTMENT → hasAppointment = true -> close modal
+       - (If there is a way to store "Inquiry vs Appointment" in backend
+         use helpdesk_type or a new field; for now just set hasAppointment
+         to the correct boolean and optionally attach a subtype to the
+         ticket via an extra state field.)
+5.4. Add a BACK button on BOTH step 2 screens so the user can return to
+     step 1 and change their answer without closing.
+
+===============================================================================
+TASK 6 — BUILD THE G TO G MODAL (mockup image 3)
+===============================================================================
+6.1. Title: "G TO G MODAL" -> subtitle "SELECT ONE"
+6.2. Two blue bevel buttons stacked vertically (identical style to Direct
+     Hire step 2B's blue buttons):
+       - INQUIRY
+       - SUBMISSION OF REQUIREMENTS   (mockup had typo SUBIMITTION — correct it)
+6.3. Actions: click either -> close modal. Optionally store the selection
+     as part of the ticket (e.g. using helpdesk_type suffix) or just mark
+     the service as selected. For now clicking either confirms the G-To-G
+     selection. User can later clarify requirement sub-types inside counter.
+
+===============================================================================
+TASK 7 — BUILD THE HELP DESK MODAL (mockup image 5)
+===============================================================================
+7.1. Title: "HELP DESK MODAL" -> question: "What do you need help with?"
+7.2. FOUR blue bevel buttons laid out in 2 columns × 2 rows grid:
+       Row 1 (top):    [  INQUIRY  ]  [    PEOS     ]
+       Row 2 (bottom): [ ACCOUNT RETRIEVAL ] [ OEC ]
+7.3. Behavior: multi-select (clicking toggles). Selected buttons use the
+     "sunken" bevel + inner highlight or checkmark. Help desk selection is
+     stored in the existing helpDeskTypes[] array.
+7.4. Large green 3D bevel button at BOTTOM CENTER labeled "DONE".
+       - Disabled when 0 buttons selected.
+       - Clicking it: closes the modal, keeping the helpDeskTypes array
+         populated with the multi-selected values that will be sent via
+         helpdesk_type (joined ", ") on ticket generation.
+7.5. Backdrop click closes modal WITHOUT changing helpDeskTypes.
+
+===============================================================================
+TASK 8 — INFORMATION SHEET (no modal, immediate selection)
+===============================================================================
+8.1. INFORMATION SHEET tile has NO modal per the mockups. Clicking it
+     simply toggles the service on/off (no question flow).
+8.2. (Optional visual: show a subtle "toggled on" sunken tile state so
+     staff can confirm it's counted before pressing Generate Ticket.)
+
+===============================================================================
+TASK 9 — REFACTOR STATE RELATIONSHIPS & toggleService SELECTION FLOW
+===============================================================================
+9.1. Rewrite toggleService function:
+       - Do NOT add the service to selectedServices on click until AFTER
+         the user completes that service's modal flow (if it has one).
+         Flow should be:
+           click tile → open modal (if needed) → user answers → THEN
+           push service into selectedServices only if they finished modal
+           (and if tile was clicked to turn ON; user can still toggle OFF
+           by clicking an already-on tile.)
+       - Exception: INFORMATION SHEET has no modal → toggle immediately
+9.2. Reason: before, Balik Manggagawa was added to selectedServices BEFORE
+     the modal was answered, so cancelling the modal still left the service
+     selected. New flow prevents "phantom" selected services.
+9.3. Add selectedServices as visual pill/badge summary near the Generate
+     button or top of the card: "Selected: Balik Manggagawa, Help Desk"
+     so the user knows which services are currently on the ticket.
+9.4. Ticket-generated success modal (showModal + generatedTicket) from
+     the existing code — keep it, style it to match the new Windows-98
+     modal look, keep displaying ticket_identifier + services list.
+
+===============================================================================
+TASK 10 — WRITE THE NEW Guard.css STYLESHEET
+===============================================================================
+10.1. Full rewrite of Guard.css. In order:
+       a) .guard-container  — outer 100vh, flex, overflow:hidden, light
+          blue-gray background (#d8dee9 or exact counter-dash tone)
+       b) .guard-header     — top strip, flex row, seal image + 3 line
+          header block left, salutation + user icon right.
+          Use exact seal sizing (approx 70px) from counter dashboard.
+       c) .guard-body       — flex row below header, min-height: 0
+          (CRITICAL rule from project_memory so sidebar/scroll doesn't
+           break — parent flex must have min-height:0 to enable inner
+           scrolling instead of stretching.)
+       d) .guard-sidebar    — 220-250px wide, light blue gradient, flex
+          column. Labels "DMW ROX"/"MWPSD" bold centered near top. Then
+          the DASHBOARD/SETTINGS buttons. LOGOUT at flex-end / bottom.
+          Bevel buttons use inset/outset box-shadow for Win-98 look.
+       e) .guard-main       — flex 1, position: relative. Watermark
+          overlay via ::before/::after or a .guard-watermark element
+          with 28% opacity dmw.png + diagonal text background.
+          scroll: only inner content scrolls if cards overflow (but
+          single card normally fits screen, overflow hidden).
+       f) .guard-services-card  — centered max-width, white, large
+          border-radius, solid border, box-shadow. Inner padding.
+          "SELECT SERVICES" all-caps heading centered near top.
+       g) .service-tiles-grid   — 3 cols × 2 rows CSS grid, gap between
+          tiles, last column of row 2 empty. Tile button: yellow
+          gradient, bold all-caps text, Win-98 bevel (box-shadow
+          light-shadow-top-left, dark-shadow-bottom-right, pressed
+          reverse shadow for active state.)
+       h) .service-tile.pressed — sunken bevel state + checkmark or
+          green top-right corner indicator + maybe a darker yellow tint.
+       i) Selected services summary line (text pills, small, above
+          Generate button or top-right of card).
+       j) .generate-ticket-btn — large solid green 3D bevel, centered,
+          min-height ~64px, uppercase, white bold text.
+       k) Modal styles: overlay (.modal-overlay) + .modal-card. Each
+          modal body section uses specific grids. Buttons reuse the
+          bevel classes (navy, red, blue, green variants).
+       l) Back button for Direct Hire step-2 screens (small dark gray
+          bevel "← BACK" in top-left or bottom-left of modal).
+10.2. RESPONSIVE: use vh/vw proportions (per project_memory user
+     preference "Expects exact replication... responsive layouts
+     utilizing relative units like vh and vw"). BUTTONS MUST BE EASY
+     TO TAP ON A TOUCHSCREEN (guard station may be a tablet). Minimum
+     tap target for tiles 140px high.
+
+===============================================================================
+TASK 11 — CONNECTIVITY & SAFETY CHECKS
+===============================================================================
+11.1. Loading overlay: keep usePageLoading tied to the "loading" state so
+      the 300ms minimum splash shows on ticket generation submit.
+11.2. Toast messages: "success" on ticket create, "warning" on 7-service
+      max hit, "error" on 0-services selected when pressing Generate.
+      All still present from existing code.
+11.3. Logout button: wire sidebar's red LOGOUT button to existing
+      handleLogout (clear auth_token + user in localStorage, navigate
+      /login).
+11.4. Settings button: placeholder action for now — toast "Settings
+      coming soon" so button is not dead.
+11.5. Dashboard button in sidebar: no-op (same view) or toast
+      "Already on Dashboard".
+
+===============================================================================
+TASK 12 — FINAL VERIFICATION
+===============================================================================
+12.1. TypeScript compile: `npm run build` in frontend folder — ZERO
+      errors / warnings about unused vars.
+12.2. useRef safety for loading hooks: no useEffect dependency array
+      anywhere inside Guard includes showLoading/hideLoading functions.
+12.3. Manual flow walkthrough check:
+        click BALIK MANGAGAWA → modal → YES → appears in Selected list
+        click DIRECT HIRE → step 1 → NO → APPOINTMENT → in list
+        click HELP DESK → multi-select 2 → DONE → in list
+        click G TO G → INQUIRY → in list
+        click INFORMATION SHEET → toggles instantly
+        click GENERATE TICKET → overlay spins → success modal opens →
+             ticket identifier + correct services shown, ticket count
+             increments in backend.
+12.4. Check browser console for "Maximum update depth exceeded" — must
+      be 0 (the earlier ref-safety fixes for overlay must remain intact).
+
+===============================================================================
+END OF TASK LIST
+===============================================================================

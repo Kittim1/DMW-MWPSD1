@@ -12,6 +12,7 @@ class User extends Authenticatable
 
     const ROLE_SUPERADMIN = 'superadmin';
     const ROLE_COUNTER = 'counter';
+    const ROLE_GUARD = 'guard';
 
     protected $fillable = [
         'name',
@@ -37,5 +38,10 @@ class User extends Authenticatable
     public function isCounter()
     {
         return $this->role === self::ROLE_COUNTER;
+    }
+
+    public function isGuard()
+    {
+        return $this->role === self::ROLE_GUARD;
     }
 }

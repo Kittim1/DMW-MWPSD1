@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\QueueController;
 use App\Http\Controllers\Api\CounterController;
+use App\Http\Controllers\Api\ServiceController;
 
 Route::group(['prefix' => 'auth'], function () {
     Route::post('/login', [AuthController::class, 'login']);
@@ -30,12 +31,25 @@ Route::group(['prefix' => 'queue'], function () {
         Route::post('/cancel/{ticketId}', [QueueController::class, 'cancelTicket']);
         Route::post('/cater/{ticketId}/{counterId}', [QueueController::class, 'caterTicket']);
         Route::post('/reset', [QueueController::class, 'resetQueue']);
+        Route::post('/forward/{ticketId}', [QueueController::class, 'forwardTicket']);
         Route::get('/reports', [QueueController::class, 'getReports']);
         Route::get('/logs', [QueueController::class, 'getSystemLogs']);
     });
 });
 
-Route::group(['prefix' => 'counters', 'middleware' => 'auth:api'], function () {
-    Route::get('/', [CounterController::class, 'getCounters']);
-    Route::put('/{id}', [CounterController::class, 'updateCounter']);
+Route::group(['prefix' => 'counters'], function () {
+    Route::get('/', [CounterController::class, 'getCounters']); // Public for landing page
+    Route::group(['middleware' => 'auth:api'], function () {
+        Route::put('/{id}', [CounterController::class, 'updateCounter']);
+    });
+});
+
+Route::group(['prefix' => 'services'], function () {
+    Route::get('/', [ServiceController::class, 'index']);
+    
+    Route::group(['middleware' => 'auth:api'], function () {
+        Route::post('/', [ServiceController::class, 'store']);
+        Route::put('/{id}', [ServiceController::class, 'update']);
+        Route::delete('/{id}', [ServiceController::class, 'destroy']);
+    });
 });

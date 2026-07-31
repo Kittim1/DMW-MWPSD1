@@ -1,20 +1,36 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import Swal from "sweetalert2";
 import Analytics from "../components/Analytics";
 import Reports from "../components/Reports";
+import Services from "../components/Services";
 import Settings from "../components/Settings";
 import Sidebar from "../components/Sidebar";
 import SystemLogs from "../components/SystemLogs";
+import {
+    useLoadingOverlay,
+    usePageLoading,
+} from "../contexts/LoadingOverlayContext";
 import { authService, counterService, queueService } from "../services/api";
 import "./Dashboard.css";
 
 interface QueueItem {
   ticket_id: number;
   priority_number: string;
+  ticket_identifier?: string;
   counter_id: number;
   status: string;
+  service_type?: string;
+  services?: string[];
+  has_appointment?: boolean;
+  client_name?: string;
+  scheduled_time?: string;
+  scheduled_day?: string;
+  helpdesk_type?: string;
+  assigned_counter_ids?: string;
+  is_priority?: boolean;
+  priority_type?: string;
+  called_at?: string;
 }
 
 interface User {
@@ -25,6 +41,36 @@ interface User {
   counter_id?: number;
 }
 
+// Client-side safety sort: Priority tickets (is_priority=true) ALWAYS first,
+// then by priority number ascending. Backend also sorts this way, this is a
+// double-guard so priority never appears below non-priority in any list.
+function sortPriorityFirst<
+  T extends { is_priority?: boolean; priority_number: string },
+>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const ap = a.is_priority ? 1 : 0;
+    const bp = b.is_priority ? 1 : 0;
+    if (ap !== bp) return bp - ap;
+    const an = parseInt(a.priority_number.replace(/\D/g, ""), 10) || 0;
+    const bn = parseInt(b.priority_number.replace(/\D/g, ""), 10) || 0;
+    return an - bn;
+  });
+}
+
+// Sort serving tickets: priority first, then by called_at ascending.
+function sortServingPriorityFirst<
+  T extends { is_priority?: boolean; called_at?: string },
+>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const ap = a.is_priority ? 1 : 0;
+    const bp = b.is_priority ? 1 : 0;
+    if (ap !== bp) return bp - ap;
+    const ta = a.called_at ? new Date(a.called_at).getTime() : 0;
+    const tb = b.called_at ? new Date(b.called_at).getTime() : 0;
+    return ta - tb;
+  });
+}
+
 function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [servingQueue, setServingQueue] = useState<QueueItem[]>([]);
@@ -32,14 +78,45 @@ function Dashboard() {
   const [skippedQueue, setSkippedQueue] = useState<QueueItem[]>([]);
   const [counters, setCounters] = useState<any[]>([]);
   const [currentTicket, setCurrentTicket] = useState<QueueItem | null>(null);
-  const [stats, setStats] = useState<{
+  const [currentlyServingTickets, setCurrentlyServingTickets] = useState<
+    QueueItem[]
+  >([]);
+  const [maxConcurrent, setMaxConcurrent] = useState<number>(1);
+  const [_stats, setStats] = useState<{
     counterCounts: { [key: number]: number };
     sessionTotals: { morning: number; afternoon: number };
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeView, setActiveView] = useState("dashboard");
+  const [reportPeriod, setReportPeriod] = useState("daily");
+  const [reports, setReports] = useState<any>(null);
+
+  // Forward modal state
+  const [showForwardModal, setShowForwardModal] = useState(false);
+  const [selectedTargetCounter, setSelectedTargetCounter] = useState<
+    number | null
+  >(null);
   const navigate = useNavigate();
+  const { showLoading, hideLoading } = useLoadingOverlay();
+
+  const showLoadingRef = useRef(showLoading);
+  const hideLoadingRef = useRef(hideLoading);
+  useEffect(() => {
+    showLoadingRef.current = showLoading;
+    hideLoadingRef.current = hideLoading;
+  });
+
+  usePageLoading(loading, "", 300);
+
+  const handleSwitchView = (view: string) => {
+    if (view === activeView) return;
+    showLoadingRef.current("", 150);
+    setTimeout(() => {
+      setActiveView(view);
+      setTimeout(() => hideLoadingRef.current(), 30);
+    }, 100);
+  };
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
@@ -53,9 +130,9 @@ function Dashboard() {
         const userData = localStorage.getItem("user");
         const userLoadTime = performance.now() - userLoadStart;
 
-        let parsedUser = null;
+        let parsedUser: User | null = null;
         if (userData) {
-          parsedUser = JSON.parse(userData);
+          parsedUser = JSON.parse(userData) as User;
           // Only update user state if it's not set yet
           setUser((prev) => prev || parsedUser);
         }
@@ -70,29 +147,62 @@ function Dashboard() {
         if (!isMounted) return;
 
         const stateStart = performance.now();
-        setServingQueue(serving);
-        setWaitingQueue(waiting);
-        setSkippedQueue(skipped || []);
+        setServingQueue(sortServingPriorityFirst(serving as QueueItem[]));
+        setWaitingQueue(sortPriorityFirst(waiting as QueueItem[]));
+        setSkippedQueue(
+          sortPriorityFirst(skipped ? (skipped as QueueItem[]) : []),
+        );
         setStats(apiStats || null);
 
-        // Fetch counters if superadmin
-        if (parsedUser?.role === "superadmin") {
+        console.log("=== Debug ===");
+        console.log("User:", parsedUser);
+        console.log("User counter_id:", parsedUser?.counter_id);
+        console.log("All waiting tickets:", waiting);
+
+        // Fetch counters for all roles except guard (guard doesn't use this section)
+        let counterList: any[] = [];
+        if (parsedUser?.role !== "guard") {
           const counterRes = await counterService.getCounters();
-          setCounters(counterRes.data);
+          counterList = counterRes.data || [];
+          setCounters(counterList);
         }
 
-        // Find current ticket for this counter if counter user
+        // Find ALL tickets currently being served by this counter (Counter 5 can have 2+)
         if (parsedUser?.counter_id) {
-          const ticket = serving.find(
-            (item: QueueItem) => item.counter_id === parsedUser.counter_id,
+          const ticketsForCounter = sortServingPriorityFirst(
+            serving.filter(
+              (item: QueueItem) => item.counter_id === parsedUser.counter_id,
+            ) as QueueItem[],
           );
-          setCurrentTicket(ticket || null);
+          setCurrentlyServingTickets(ticketsForCounter);
+          setCurrentTicket(ticketsForCounter[0] || null);
+
+          // Look up maximum concurrent ticket capacity for this counter
+          const thisCounter = counterList.find(
+            (c: any) => c.id === parsedUser?.counter_id,
+          );
+          const capacity =
+            thisCounter?.max_concurrent ??
+            (parsedUser.counter_id === 5 ? 2 : 1);
+          setMaxConcurrent(Math.max(1, capacity as number));
+        }
+
+        // Fetch reports for counter or superadmin
+        if (
+          parsedUser?.role === "counter" ||
+          parsedUser?.role === "superadmin"
+        ) {
+          const reportRes = await queueService.getReports(
+            reportPeriod,
+            parsedUser.counter_id,
+          );
+          setReports(reportRes.data);
         }
         const stateTime = performance.now() - stateStart;
         console.log(`State update time: ${stateTime.toFixed(2)}ms`);
 
         const totalTime = performance.now() - startTime;
-        console.log(`✓ Total fetchData time: ${totalTime.toFixed(2)}ms`);
+        console.log(`✅ Total fetchData time: ${totalTime.toFixed(2)}ms`);
       } catch (error) {
         console.error("Failed to fetch data:", error);
         if (isMounted) {
@@ -114,20 +224,19 @@ function Dashboard() {
       isMounted = false;
       clearTimeout(timeoutId);
     };
-  }, [navigate]);
+  }, [navigate, reportPeriod]);
+
+  useEffect(() => {
+    if ((user?.role === "counter" || user?.role === "superadmin") && !loading) {
+      queueService.getReports(reportPeriod, user?.counter_id).then((res) => {
+        setReports(res.data);
+      });
+    }
+  }, [reportPeriod, user]);
 
   const handleLogout = async () => {
-    const result = await Swal.fire({
-      title: "Are you sure?",
-      text: "You will be logged out of your session.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#4e73df",
-      cancelButtonColor: "#858796",
-      confirmButtonText: "Yes, log me out",
-    });
-
-    if (result.isConfirmed) {
+    if (window.confirm("Are you sure you want to log out?")) {
+      showLoadingRef.current("", 250);
       try {
         await authService.logout();
         toast.info("Logged out successfully.");
@@ -137,7 +246,9 @@ function Dashboard() {
       } finally {
         localStorage.removeItem("auth_token");
         localStorage.removeItem("user");
-        navigate("/login");
+        setTimeout(() => {
+          navigate("/login");
+        }, 100);
       }
     }
   };
@@ -152,17 +263,24 @@ function Dashboard() {
     if (currentTicket && !isProcessing) {
       setIsProcessing(true);
       try {
+        const completedTicketNumber = currentTicket.priority_number;
         await queueService.completeService(currentTicket.ticket_id);
         const response = await queueService.getStatus();
         const { serving, skipped } = response.data;
-        const ticket = serving.find(
-          (item: QueueItem) => item.counter_id === user?.counter_id,
-        );
-        setCurrentTicket(ticket || null);
-        setServingQueue(serving);
-        setSkippedQueue(skipped || []);
 
-        const successMsg = `✓ Ticket ${currentTicket.priority_number} marked as completed successfully!`;
+        const allForCounter = sortServingPriorityFirst(
+          serving.filter(
+            (item: QueueItem) => item.counter_id === user?.counter_id,
+          ) as QueueItem[],
+        );
+        setCurrentlyServingTickets(allForCounter);
+        setCurrentTicket(allForCounter[0] || null);
+        setServingQueue(sortServingPriorityFirst(serving as QueueItem[]));
+        setSkippedQueue(
+          sortPriorityFirst(skipped ? (skipped as QueueItem[]) : []),
+        );
+
+        const successMsg = `✅ Ticket ${completedTicketNumber} marked as completed successfully!`;
         toast.success(successMsg);
       } catch (error) {
         console.error("Failed to mark complete:", error);
@@ -178,15 +296,24 @@ function Dashboard() {
     if (currentTicket && !isProcessing) {
       setIsProcessing(true);
       try {
+        const skippedTicketNumber = currentTicket.priority_number;
         await queueService.skipTicket(currentTicket.ticket_id);
         const response = await queueService.getStatus();
         const { serving, skipped } = response.data;
 
-        setCurrentTicket(null); // Explicitly clear current ticket
-        setServingQueue(serving);
-        setSkippedQueue(skipped || []);
+        const allForCounter = sortServingPriorityFirst(
+          serving.filter(
+            (item: QueueItem) => item.counter_id === user?.counter_id,
+          ) as QueueItem[],
+        );
+        setCurrentlyServingTickets(allForCounter);
+        setCurrentTicket(allForCounter[0] || null);
+        setServingQueue(sortServingPriorityFirst(serving as QueueItem[]));
+        setSkippedQueue(
+          sortPriorityFirst(skipped ? (skipped as QueueItem[]) : []),
+        );
 
-        const successMsg = `Ticket ${currentTicket.priority_number} has been skipped.`;
+        const successMsg = `Ticket ${skippedTicketNumber} has been skipped.`;
         toast.info(successMsg);
       } catch (error) {
         console.error("Failed to skip ticket:", error);
@@ -199,8 +326,9 @@ function Dashboard() {
 
   const handleCaterAgain = async (ticket: QueueItem) => {
     console.log("handleCaterAgain function called", ticket);
-    if (currentTicket) {
-      const errorMsg = `You are already serving ticket ${currentTicket.priority_number}. Please complete or skip it first.`;
+    const atCapacity = currentlyServingTickets.length >= maxConcurrent;
+    if (atCapacity) {
+      const errorMsg = `You are already serving ${currentlyServingTickets.length}/${maxConcurrent} ticket(s). Please complete one first.`;
       toast.warning(errorMsg);
       return;
     }
@@ -212,56 +340,24 @@ function Dashboard() {
         const response = await queueService.getStatus();
         const { serving, skipped } = response.data;
 
-        const foundTicket = serving.find(
-          (item: QueueItem) => item.counter_id === user.counter_id,
+        const allForCounter = sortServingPriorityFirst(
+          serving.filter(
+            (item: QueueItem) => item.counter_id === user.counter_id,
+          ) as QueueItem[],
         );
-        setCurrentTicket(foundTicket || null);
-        setServingQueue(serving);
-        setSkippedQueue(skipped || []);
+        setCurrentlyServingTickets(allForCounter);
+        setCurrentTicket(allForCounter[0] || null);
+        setServingQueue(sortServingPriorityFirst(serving as QueueItem[]));
+        setSkippedQueue(
+          sortPriorityFirst(skipped ? (skipped as QueueItem[]) : []),
+        );
 
         toast.success(
-          `✓ Now serving skipped ticket ${foundTicket?.priority_number}`,
+          `✅ Now serving skipped ticket ${allForCounter[allForCounter.length - 1]?.priority_number || ticket.priority_number}`,
         );
       } catch (error) {
         console.error("Failed to cater ticket again:", error);
         toast.error("Failed to serve ticket. Please try again.");
-      } finally {
-        setIsProcessing(false);
-      }
-    }
-  };
-
-  const handleCancelTicket = async (ticket: QueueItem) => {
-    const result = await Swal.fire({
-      title: "Cancel Ticket?",
-      text: `Are you sure you want to cancel ticket ${ticket.priority_number}? This will remove it from the queue entirely.`,
-      icon: "error",
-      showCancelButton: true,
-      confirmButtonColor: "#e74a3b",
-      cancelButtonColor: "#858796",
-      confirmButtonText: "Yes, cancel it",
-    });
-
-    if (result.isConfirmed) {
-      setIsProcessing(true);
-      try {
-        await queueService.cancelTicket(ticket.ticket_id);
-        const response = await queueService.getStatus();
-        const { serving, waiting, skipped } = response.data;
-
-        setServingQueue(serving);
-        setWaitingQueue(waiting);
-        setSkippedQueue(skipped || []);
-
-        // Clear current ticket if it was the one cancelled
-        if (ticket.ticket_id === currentTicket?.ticket_id) {
-          setCurrentTicket(null);
-        }
-
-        toast.info(`Ticket ${ticket.priority_number} has been cancelled.`);
-      } catch (error) {
-        console.error("Failed to cancel ticket:", error);
-        toast.error("Failed to cancel ticket. Please try again.");
       } finally {
         setIsProcessing(false);
       }
@@ -275,9 +371,10 @@ function Dashboard() {
       currentTicket,
     });
 
-    // Check if counter is already serving a ticket
-    if (currentTicket) {
-      const errorMsg = `You are already serving ticket ${currentTicket.priority_number}. Please complete it first before serving another ticket.`;
+    // Check if counter is at its max concurrent capacity (Counter 5 can serve 2)
+    const atCapacity = currentlyServingTickets.length >= maxConcurrent;
+    if (atCapacity) {
+      const errorMsg = `You are already serving ${currentlyServingTickets.length}/${maxConcurrent} ticket(s). Please complete one first before serving another.`;
       console.warn(errorMsg);
       toast.warning(errorMsg);
       return;
@@ -286,29 +383,49 @@ function Dashboard() {
     if (user?.counter_id && ticket && !isProcessing) {
       setIsProcessing(true);
       try {
-        console.log(
-          "Calling API with ticket_id:",
-          ticket.ticket_id,
-          "counter_id:",
-          user.counter_id,
-        );
-        // Use caterTicket instead of callNext to ensure we get the specific ticket clicked
-        await queueService.caterTicket(ticket.ticket_id, user.counter_id);
-        console.log("caterTicket API succeeded");
+        const isClaireOrLizaOrEda = [
+          "claire@dmw.com",
+          "liza@dmw.com",
+          "eda@dmw.com",
+        ].includes(user.email);
+
+        if (isClaireOrLizaOrEda) {
+          // Allow selecting any ticket for DH/G2G users
+          console.log(
+            "Calling caterTicket with ticket_id:",
+            ticket.ticket_id,
+            "counter_id:",
+            user.counter_id,
+          );
+          await queueService.caterTicket(ticket.ticket_id, user.counter_id);
+        } else {
+          // For other counters, use callNext (FCFS)
+          console.log("Calling callNext with counter_id:", user.counter_id);
+          await queueService.callNext(user.counter_id);
+        }
+
+        console.log("API succeeded");
         const response = await queueService.getStatus();
         const { serving, waiting, skipped } = response.data;
         console.log("Updated serving queue:", serving);
         console.log("Updated waiting queue:", waiting);
-        const foundTicket = serving.find(
-          (item: QueueItem) => item.counter_id === user.counter_id,
-        );
-        setCurrentTicket(foundTicket || null);
-        setServingQueue(serving);
-        setWaitingQueue(waiting);
-        setSkippedQueue(skipped || []);
-        console.log("State updated with new ticket:", foundTicket);
 
-        const successMsg = `✓ Successfully serving ticket ${foundTicket?.priority_number}`;
+        const allForCounter = sortServingPriorityFirst(
+          serving.filter(
+            (item: QueueItem) => item.counter_id === user?.counter_id,
+          ) as QueueItem[],
+        );
+        setCurrentlyServingTickets(allForCounter);
+        const firstTicket = allForCounter[0] || null;
+        setCurrentTicket(firstTicket);
+        setServingQueue(sortServingPriorityFirst(serving as QueueItem[]));
+        setWaitingQueue(sortPriorityFirst(waiting as QueueItem[]));
+        setSkippedQueue(
+          sortPriorityFirst(skipped ? (skipped as QueueItem[]) : []),
+        );
+        console.log("State updated with new tickets:", allForCounter);
+
+        const successMsg = `✅ Successfully serving ticket ${firstTicket?.priority_number || ticket.priority_number}`;
         toast.success(successMsg);
       } catch (error) {
         console.error("Failed to cater ticket:", error);
@@ -325,26 +442,29 @@ function Dashboard() {
   };
 
   const handleResetQueue = async () => {
-    const result = await Swal.fire({
-      title: "Reset Today's Queue?",
-      text: "This will delete ALL tickets and reset all counters. This action cannot be undone!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#e74a3b",
-      cancelButtonColor: "#858796",
-      confirmButtonText: "Yes, Reset Everything",
-    });
-
-    if (result.isConfirmed) {
+    if (
+      window.confirm(
+        "Are you sure you want to reset the entire queue? This will delete all current tickets for this session.",
+      )
+    ) {
       setIsProcessing(true);
       try {
         await queueService.resetQueue();
         const response = await queueService.getStatus();
         const { serving, waiting, skipped } = response.data;
-        setServingQueue(serving);
-        setWaitingQueue(waiting);
-        setSkippedQueue(skipped || []);
-        setCurrentTicket(null);
+
+        const allForCounter = sortServingPriorityFirst(
+          serving.filter(
+            (item: QueueItem) => item.counter_id === user?.counter_id,
+          ) as QueueItem[],
+        );
+        setCurrentlyServingTickets(allForCounter);
+        setServingQueue(sortServingPriorityFirst(serving as QueueItem[]));
+        setWaitingQueue(sortPriorityFirst(waiting as QueueItem[]));
+        setSkippedQueue(
+          sortPriorityFirst(skipped ? (skipped as QueueItem[]) : []),
+        );
+        setCurrentTicket(allForCounter[0] || null);
         toast.success("Queue has been reset successfully.");
       } catch (error) {
         console.error("Failed to reset queue:", error);
@@ -371,257 +491,682 @@ function Dashboard() {
     }
   };
 
-  if (loading) {
-    return <div className="loading">Loading...</div>;
+  const handleForward = async () => {
+    if (!currentTicket || !selectedTargetCounter) return;
+
+    setIsProcessing(true);
+    try {
+      await queueService.forwardTicket(
+        currentTicket.ticket_id,
+        selectedTargetCounter,
+      );
+      // Refresh queue data
+      const response = await queueService.getStatus();
+      const { serving, waiting, skipped } = response.data;
+
+      const allForCounter = sortServingPriorityFirst(
+        serving.filter((item: QueueItem) => item.counter_id === user?.counter_id) as QueueItem[],
+      );
+      setCurrentlyServingTickets(allForCounter);
+      setServingQueue(sortServingPriorityFirst(serving as QueueItem[]));
+      setWaitingQueue(sortPriorityFirst(waiting as QueueItem[]));
+      setSkippedQueue(sortPriorityFirst(skipped ? (skipped as QueueItem[]) : []));
+      setCurrentTicket(allForCounter[0] || null);
+      setShowForwardModal(false);
+      setSelectedTargetCounter(null);
+      toast.success("Ticket forwarded successfully!");
+    } catch (error) {
+      console.error("Failed to forward ticket:", error);
+      toast.error("Failed to forward ticket.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // ---- Mockup Layout: reusable ticket filters (for counter dashboard) ----
+  const getFilteredWaiting = (): QueueItem[] => {
+    if (!user) return [];
+    return waitingQueue.filter((item: QueueItem) => {
+      const isClaireOrLizaOrEda = [
+        "claire@dmw.com",
+        "liza@dmw.com",
+        "eda@dmw.com",
+      ].includes(user.email);
+      let assignedIds: number[] = [];
+      if (Array.isArray((item as any).assigned_counter_ids)) {
+        assignedIds = (item as any).assigned_counter_ids;
+      } else if (typeof (item as any).assigned_counter_ids === "string") {
+        try {
+          const parsed = JSON.parse((item as any).assigned_counter_ids);
+          assignedIds = Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          assignedIds = [];
+        }
+      }
+      if (isClaireOrLizaOrEda) {
+        return (
+          ["Direct Hire", "G to G"].includes(item.service_type!) ||
+          (!!user.counter_id && assignedIds.includes(user.counter_id))
+        );
+      }
+      if (!user.counter_id) return false;
+      return assignedIds.includes(user.counter_id) || assignedIds.length === 0;
+    });
+  };
+
+  const getFilteredSkipped = (): QueueItem[] => {
+    if (!user) return [];
+    return skippedQueue.filter((item: QueueItem) => {
+      const isClaireOrLizaOrEda = [
+        "claire@dmw.com",
+        "liza@dmw.com",
+        "eda@dmw.com",
+      ].includes(user.email);
+      let assignedIds: number[] = [];
+      if (Array.isArray((item as any).assigned_counter_ids)) {
+        assignedIds = (item as any).assigned_counter_ids;
+      } else if (typeof (item as any).assigned_counter_ids === "string") {
+        try {
+          const parsed = JSON.parse((item as any).assigned_counter_ids);
+          assignedIds = Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          assignedIds = [];
+        }
+      }
+      if (isClaireOrLizaOrEda) {
+        return (
+          ["Direct Hire", "G to G"].includes(item.service_type!) ||
+          (!!user.counter_id && assignedIds.includes(user.counter_id))
+        );
+      }
+      if (!user.counter_id) return false;
+      return assignedIds.includes(user.counter_id) || assignedIds.length === 0;
+    });
+  };
+
+  if (user?.role === "guard") {
+    useEffect(() => {
+      navigate("/guard", { replace: true });
+    }, [navigate]);
+    return null;
   }
 
-  const getServingByCounter = () => {
-    console.log("getServingByCounter function called");
-    const counterMap: { [key: number]: QueueItem } = {};
-    servingQueue.forEach((item) => {
-      if (item.counter_id && !counterMap[item.counter_id]) {
-        counterMap[item.counter_id] = item;
-      }
-    });
-    return counterMap;
-  };
+  const isCounterDashboard =
+    user?.role === "counter" && activeView === "dashboard";
 
   return (
     <div className="dashboard-layout">
-      <Sidebar
-        role={user?.role || ""}
-        onLogout={handleLogout}
-        activeView={activeView}
-        setActiveView={setActiveView}
-      />
+      {!isCounterDashboard && (
+        <Sidebar
+          role={user?.role || ""}
+          onLogout={handleLogout}
+          activeView={activeView}
+          setActiveView={handleSwitchView}
+        />
+      )}
 
-      <div className="dashboard-container">
-        <header className="dashboard-header">
-          <div className="header-content">
-            <h1>
-              {activeView === "dashboard"
-                ? "Queue Management Dashboard"
-                : activeView === "reports"
-                  ? "Reports & Analytics"
-                  : activeView === "logs"
-                    ? "System Activity Logs"
-                    : "Settings"}
-            </h1>
-            <div className="user-info">
-              <span className="user-name">
-                Welcome, {user?.name} ({user?.role})
-              </span>
+      <div
+        className={`dashboard-container ${isCounterDashboard ? "counter-fullwidth" : ""}`}
+      >
+        {!isCounterDashboard && (
+          <header className="dashboard-header">
+            <div className="header-content">
+              <h1>
+                {activeView === "dashboard"
+                  ? "Queue Management Dashboard"
+                  : activeView === "services"
+                    ? "Services Management"
+                    : activeView === "reports"
+                      ? "Reports & Analytics"
+                      : activeView === "logs"
+                        ? "System Activity Logs"
+                        : "Settings"}
+              </h1>
+              <div className="user-info">
+                <span className="user-name">
+                  Welcome, {user?.name} ({user?.role})
+                </span>
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         <main className="dashboard-main">
-          {activeView === "reports" ? (
+          {activeView === "services" ? (
+            <Services />
+          ) : activeView === "reports" ? (
             <Reports />
           ) : activeView === "logs" ? (
             <SystemLogs />
           ) : activeView === "settings" ? (
             <Settings user={user} onUserUpdate={handleUserUpdate} />
           ) : user?.role === "counter" ? (
-            <div className="counter-dashboard">
-              {/* <h2>Counter Service Panel</h2> */}
-              <div className="counter-stats-container">
-                <div className="stats-card">
-                  <h4>Today's Performance</h4>
-                  <div className="counter-counts-grid">
-                    {[1, 2, 3, 4, 5].map((cId) => (
-                      <div
-                        key={cId}
-                        className={`count-item ${user?.counter_id === cId ? "highlight" : ""}`}
-                      >
-                        <span className="count-label">C{cId}</span>
-                        <span className="count-value">
-                          {stats?.counterCounts[cId] || 0}
-                        </span>
+            <div className="counter-mockup-dashboard">
+              {/* ========== TOP HEADER (DMW branding + user) ========== */}
+              <header className="mockup-header">
+                <div className="mockup-header-left">
+                  <div className="dmw-seal" aria-label="DMW Seal">
+                    <img src="/dmw.png" alt="DMW Seal" className="seal-img" />
+                  </div>
+                  <div className="dmw-text">
+                    <p className="dmw-republic">Republic of the Philippines</p>
+                    <p className="dmw-dept">DEPARTMENT OF MIGRANT WORKERS</p>
+                    <p className="dmw-office">Regional Office X</p>
+                  </div>
+                </div>
+                <div className="mockup-header-right">
+                  <div className="hello-user">
+                    hello, Counter{user?.counter_id ?? ""}
+                  </div>
+                  <div className="user-avatar" aria-hidden="true">
+                    <svg viewBox="0 0 40 40" width="40" height="40">
+                      <rect
+                        x="0"
+                        y="0"
+                        width="40"
+                        height="40"
+                        fill="#fff"
+                        rx="4"
+                      />
+                      <circle cx="20" cy="15" r="7" fill="#222" />
+                      <path
+                        d="M 6 38 Q 6 26 20 26 Q 34 26 34 38 Z"
+                        fill="#222"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              </header>
+
+              {/* ========== MAIN BODY: custom left sidebar + right content ========== */}
+              <div className="mockup-body">
+                {/* LEFT SIDEBAR */}
+                <aside className="mockup-sidebar">
+                  <div className="sidebar-brand">
+                    <p className="brand-line1">DMW ROX</p>
+                    <p className="brand-line2">MWPSD</p>
+                  </div>
+
+                  <button
+                    className={`sidebar-btn ${activeView === "dashboard" ? "active" : ""}`}
+                    onClick={() => handleSwitchView("dashboard")}
+                  >
+                    DASHBOARD
+                  </button>
+                  <button
+                    className={`sidebar-btn ${activeView === "settings" ? "active" : ""}`}
+                    onClick={() => handleSwitchView("settings")}
+                  >
+                    SETTINGS
+                  </button>
+
+                  <div className="sidebar-spacer"></div>
+
+                  <button className="sidebar-logout" onClick={handleLogout}>
+                    LOGOUT
+                  </button>
+                </aside>
+
+                {/* RIGHT CONTENT AREA */}
+                <main className="mockup-main">
+                  {/* ===== TOP ROW: YELLOW — Current Catered Numbers left + You Are Serving right ===== */}
+                  <div className="mockup-top-row">
+                    {/* LEFT: Current Catered Numbers */}
+                    <section className="mockup-section mockup-yellow mockup-catered-wrap">
+                      <h2 className="mockup-section-title">
+                        CURRENT CATERED NUMBERS
+                      </h2>
+                      <div className="mockup-catered-counters">
+                        {(() => {
+                          // Build slot list: for counters with max_concurrent > 1, render 2 cards
+                          const slotList: Array<{
+                            counterId: number;
+                            counterName: string;
+                            isActive: boolean;
+                            ticket: QueueItem | undefined;
+                            serviceLabel: string;
+                            displayNumber: string;
+                            isPriority: boolean;
+                          }> = [];
+                          const serviceHeaderByCounter: Record<number, string> =
+                            {
+                              1: "",
+                              2: "PEOS",
+                              3: "INFO SHEET",
+                              4: "DIRECT HIRE",
+                              5: "WITH APPOINTMENT",
+                            };
+                          counters
+                            .filter((c) => c.is_active)
+                            .forEach((counter) => {
+                              const slots = Math.max(
+                                1,
+                                counter.max_concurrent ??
+                                  (counter.id === 5 ? 2 : 1),
+                              );
+                              const ticketsForCounter = servingQueue.filter(
+                                (t: any) => t.counter_id === counter.id,
+                              );
+                              for (let s = 0; s < slots; s++) {
+                                const ticket = ticketsForCounter[s];
+                                const hasAppt = Boolean(
+                                  (ticket as any)?.has_appointment,
+                                );
+                                const rawService =
+                                  (ticket as any)?.service_type ||
+                                  ((ticket as any)?.services &&
+                                    (ticket as any).services[0]) ||
+                                  "";
+                                // If counter has a static header (per mockup) prefer it for
+                                // the top service-label line; fall back to the ticket's service.
+                                const headerLabel =
+                                  (counter.id === 5
+                                    ? hasAppt
+                                      ? serviceHeaderByCounter[5]
+                                      : ""
+                                    : serviceHeaderByCounter[counter.id]) ||
+                                  (rawService === "PEOS"
+                                    ? "PEOS"
+                                    : rawService === "Information Sheet"
+                                      ? "INFO SHEET"
+                                      : rawService === "Direct Hire"
+                                        ? "DIRECT HIRE"
+                                        : rawService === "Balik Manggagawa"
+                                          ? hasAppt
+                                            ? "WITH APPOINTMENT"
+                                            : ""
+                                          : rawService || "");
+                                const identifier =
+                                  (ticket as any)?.ticket_identifier ||
+                                  (ticket as any)?.priority_number;
+                                const displayNumber = identifier
+                                  ? String(identifier).includes("-")
+                                    ? identifier
+                                    : identifier
+                                  : "----";
+                                slotList.push({
+                                  counterId: counter.id,
+                                  counterName: `COUNTER ${counter.id}`,
+                                  isActive: user?.counter_id === counter.id,
+                                  ticket,
+                                  serviceLabel: headerLabel,
+                                  displayNumber,
+                                  isPriority: !!(ticket as any)?.is_priority,
+                                });
+                              }
+                            });
+                          return slotList.map((slot, idx) => (
+                            <div
+                              key={`counter-${slot.counterId}-slot-${idx}`}
+                              className={`mockup-catered-card ${slot.isActive ? "active" : ""} ${slot.isPriority ? "priority" : ""}`}
+                            >
+                              {slot.serviceLabel && (
+                                <p className="mockup-catered-service">
+                                  {slot.serviceLabel}
+                                </p>
+                              )}
+                              <p
+                                className={`mockup-catered-number ${slot.isPriority ? "priority-text" : ""}`}
+                              >
+                                {slot.displayNumber}
+                              </p>
+                              <p className="mockup-catered-counter-label">
+                                {slot.counterName}
+                              </p>
+                            </div>
+                          ));
+                        })()}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </section>
 
-                <div className="stats-card">
-                  <h4>Session Totals</h4>
-                  <div className="session-counts">
-                    <div className="session-item">
-                      <span className="session-label">Morning</span>
-                      <span className="session-value">
-                        {stats?.sessionTotals.morning || 0}
-                      </span>
-                    </div>
-                    <div className="session-divider"></div>
-                    <div className="session-item">
-                      <span className="session-label">Afternoon</span>
-                      <span className="session-value">
-                        {stats?.sessionTotals.afternoon || 0}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="counter-content">
-                <div className="catered-section">
-                  <h3>CURRENT CATERED NUMBERS</h3>
-                  <div className="catered-counters">
-                    {(() => {
-                      const counterMap = getServingByCounter();
-                      return [1, 2, 3, 4, 5].map((cId) => (
-                        <div
-                          key={cId}
-                          className={`catered-counter ${
-                            user?.counter_id === cId ? "active" : ""
-                          }`}
+                    {/* RIGHT: You Are Serving */}
+                    <section className="mockup-section mockup-yellow mockup-serving-wrap">
+                      <h2 className="mockup-section-title">YOU ARE SERVING</h2>
+                      <div
+                        className={`mockup-serving-box ${currentTicket?.is_priority ? "priority" : ""}`}
+                      >
+                        <p
+                          className={`mockup-serving-number ${currentTicket?.is_priority ? "priority-text" : ""}`}
                         >
-                          <p className="counter-label">PRIORITY</p>
-                          <p className="counter-number">
-                            {counterMap[cId]?.priority_number || "—"}
-                          </p>
-                          <p className="counter-label">COUNTER {cId}</p>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                </div>
-
-                <div className="serving-section">
-                  <h3>YOU ARE SERVING</h3>
-                  <div className="serving-display">
-                    <p className="serving-number">
-                      {currentTicket?.priority_number || "—"}
-                    </p>
-                    {!currentTicket ? (
-                      <button
-                        className="call-next-btn"
-                        onClick={() => handleCater(waitingQueue[0])}
-                        disabled={isProcessing || waitingQueue.length === 0}
-                      >
-                        {isProcessing ? "PROCESSING..." : "CALL NEXT TICKET"}
-                      </button>
-                    ) : (
-                      <button
-                        className="mark-complete-btn"
-                        onClick={handleMarkComplete}
-                        disabled={isProcessing}
-                      >
-                        {isProcessing ? "PROCESSING..." : "MARK AS COMPLETED"}
-                      </button>
-                    )}
-                    {currentTicket && (
-                      <div className="serving-actions-secondary">
+                          {currentTicket?.priority_number || "00"}
+                        </p>
+                        {currentTicket?.is_priority &&
+                          currentTicket?.priority_type && (
+                            <p className="mockup-serving-priority-tag">
+                              ⚑ {currentTicket.priority_type}
+                            </p>
+                          )}
                         <button
-                          className="skip-link-btn"
+                          className="mockup-mark-complete"
+                          onClick={handleMarkComplete}
+                          disabled={isProcessing || !currentTicket}
+                        >
+                          {isProcessing ? "PROCESSING..." : "MARK AS COMPLETE"}
+                        </button>
+                        <button
+                          className="mockup-skip-link"
                           onClick={handleSkip}
-                          disabled={isProcessing}
+                          disabled={isProcessing || !currentTicket}
                         >
                           SKIP THIS NUMBER
                         </button>
-                        <span className="action-divider">|</span>
-                        <button
-                          className="cancel-link-btn"
-                          onClick={() => handleCancelTicket(currentTicket)}
-                          disabled={isProcessing}
-                        >
-                          CANCEL TICKET
-                        </button>
+                        {currentTicket &&
+                          (user?.counter_id === 1 || user?.counter_id === 2) &&
+                          (currentTicket.service_type === "Help Desk" ||
+                            currentTicket.helpdesk_type?.includes(
+                              "Inquiry",
+                            )) && (
+                            <button
+                              className="mockup-forward-btn"
+                              onClick={() => setShowForwardModal(true)}
+                              disabled={isProcessing}
+                            >
+                              FORWARD TO COUNTER
+                            </button>
+                          )}
                       </div>
-                    )}
+                    </section>
                   </div>
-                </div>
+
+                  {/* ===== BOTTOM ROW: LIGHT BLUE — NOT CATERED / PRIORITY / SKIPPED with ACTIONS ===== */}
+                  <section className="mockup-section mockup-bottom-section">
+                    <img
+                      src="/dmw.png"
+                      alt=""
+                      className="mockup-bottom-watermark"
+                      aria-hidden="true"
+                    />
+                    <div className="mockup-bottom-grid">
+                      {(() => {
+                        const allWaiting = getFilteredWaiting();
+                        const regularWaiting = allWaiting.filter(
+                          (t) => !t.is_priority,
+                        );
+                        const priorityWaiting = allWaiting.filter(
+                          (t) => t.is_priority,
+                        );
+                        const caterDisabled =
+                          currentlyServingTickets.length >= maxConcurrent ||
+                          isProcessing;
+
+                        return (
+                          <>
+                            {/* ----- NOT CATERED NUMBERS column ----- */}
+                            <div className="mockup-bottom-col mockup-col-not-catered">
+                              <div className="mockup-col-head-row">
+                                <div className="mockup-col-head">
+                                  <p className="mockup-col-title">
+                                    NOT CATERED NUMBERS:
+                                  </p>
+                                </div>
+                                <div className="mockup-col-head">
+                                  <p className="mockup-col-title">ACTIONS</p>
+                                </div>
+                              </div>
+                              <div className="mockup-col-body">
+                                {regularWaiting.length > 0 ? (
+                                  regularWaiting.map((item) => (
+                                    <div
+                                      key={item.ticket_id}
+                                      className="mockup-row"
+                                    >
+                                      <div className="mockup-cell mockup-cell-number">
+                                        <p className="mockup-ticket-num">
+                                          {item.priority_number}
+                                        </p>
+                                      </div>
+                                      <div className="mockup-cell mockup-cell-action">
+                                        <button
+                                          className="mockup-cater-btn"
+                                          onClick={() => handleCater(item)}
+                                          disabled={caterDisabled}
+                                          title={
+                                            caterDisabled
+                                              ? currentlyServingTickets.length >=
+                                                maxConcurrent
+                                                ? `Serving ${currentlyServingTickets.length}/${maxConcurrent} slots`
+                                                : "Processing..."
+                                              : "Call and cater this ticket"
+                                          }
+                                        >
+                                          {isProcessing ? "..." : "CATER"}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="mockup-row mockup-empty">
+                                    <div className="mockup-cell mockup-cell-number">
+                                      <p className="mockup-ticket-num mockup-empty-text">
+                                        —
+                                      </p>
+                                    </div>
+                                    <div className="mockup-cell mockup-cell-action">
+                                      <button
+                                        className="mockup-cater-btn"
+                                        disabled
+                                      >
+                                        CATER
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* ----- VERTICAL DIVIDER ----- */}
+                            <div className="mockup-col-divider-v"></div>
+
+                            {/* ----- PRIORITY column (dedicated, always visible per mockup) ----- */}
+                            <div className="mockup-bottom-col mockup-col-priority">
+                              <div className="mockup-col-head-row">
+                                <div className="mockup-col-head">
+                                  <p className="mockup-col-title mockup-col-title-priority">
+                                    ⚑ PRIORITY:
+                                  </p>
+                                </div>
+                                <div className="mockup-col-head">
+                                  <p className="mockup-col-title">ACTIONS</p>
+                                </div>
+                              </div>
+                              <div className="mockup-col-body">
+                                {priorityWaiting.length > 0 ? (
+                                  priorityWaiting.map((item) => (
+                                    <div
+                                      key={item.ticket_id}
+                                      className="mockup-row mockup-row-priority"
+                                    >
+                                      <div className="mockup-cell mockup-cell-number">
+                                        <p className="mockup-ticket-num mockup-ticket-num-priority">
+                                          {item.priority_number}
+                                          <span className="mockup-priority-chip">
+                                            {item.priority_type || "PRIORITY"}
+                                          </span>
+                                        </p>
+                                      </div>
+                                      <div className="mockup-cell mockup-cell-action">
+                                        <button
+                                          className="mockup-cater-btn mockup-cater-btn-priority"
+                                          onClick={() => handleCater(item)}
+                                          disabled={caterDisabled}
+                                          title={
+                                            caterDisabled
+                                              ? currentlyServingTickets.length >=
+                                                maxConcurrent
+                                                ? `Serving ${currentlyServingTickets.length}/${maxConcurrent} slots`
+                                                : "Processing..."
+                                              : "Call priority ticket"
+                                          }
+                                        >
+                                          {isProcessing ? "..." : "CATER"}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="mockup-row mockup-empty">
+                                    <div className="mockup-cell mockup-cell-number">
+                                      <p className="mockup-ticket-num mockup-empty-text">
+                                        —
+                                      </p>
+                                    </div>
+                                    <div className="mockup-cell mockup-cell-action">
+                                      <button
+                                        className="mockup-cater-btn mockup-cater-btn-priority"
+                                        disabled
+                                      >
+                                        CATER
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+
+                    {/* ===== HORIZONTAL DIVIDER + SKIPPED NUMBERS ROW below ===== */}
+                    <div className="mockup-divider-h"></div>
+
+                    <div className="mockup-skipped-row">
+                      <div className="mockup-bottom-col mockup-col-skipped">
+                        <div className="mockup-col-head-row">
+                          <div className="mockup-col-head">
+                            <p className="mockup-col-title">SKIPPED NUMBERS:</p>
+                          </div>
+                          <div className="mockup-col-head">
+                            <p className="mockup-col-title">ACTIONS</p>
+                          </div>
+                        </div>
+                        <div className="mockup-skipped-body">
+                          {(() => {
+                            const skippedList = getFilteredSkipped();
+                            const caterAgainDisabled =
+                              currentlyServingTickets.length >= maxConcurrent ||
+                              isProcessing;
+                            return (
+                              <>
+                                <div className="mockup-skipped-numbers">
+                                  {skippedList.length > 0 ? (
+                                    skippedList.map((item) => (
+                                      <div
+                                        key={`num-${item.ticket_id}`}
+                                        className={`mockup-cell mockup-cell-number ${item.is_priority ? "priority" : ""}`}
+                                      >
+                                        <p
+                                          className={`mockup-ticket-num mockup-ticket-num-skipped ${item.is_priority ? "priority-text" : ""}`}
+                                        >
+                                          {item.priority_number}
+                                        </p>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="mockup-cell mockup-cell-number">
+                                      <p className="mockup-ticket-num mockup-empty-text">
+                                        —
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="mockup-skipped-actions">
+                                  {skippedList.length > 0 ? (
+                                    skippedList.map((item) => (
+                                      <div
+                                        key={`act-${item.ticket_id}`}
+                                        className="mockup-skipped-action-row"
+                                      >
+                                        <button
+                                          className="mockup-cater-again-btn"
+                                          onClick={() => handleCaterAgain(item)}
+                                          disabled={caterAgainDisabled}
+                                          title={
+                                            caterAgainDisabled
+                                              ? currentlyServingTickets.length >=
+                                                maxConcurrent
+                                                ? `Serving ${currentlyServingTickets.length}/${maxConcurrent} slots`
+                                                : "Processing..."
+                                              : "Re-cater this skipped ticket"
+                                          }
+                                        >
+                                          {isProcessing ? "..." : "CATER AGAIN"}
+                                        </button>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="mockup-skipped-action-row">
+                                      <button
+                                        className="mockup-cater-again-btn"
+                                        disabled
+                                      >
+                                        CATER AGAIN
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                </main>
               </div>
 
-              <div className="dashboard-section">
-                <h3>Dashboard</h3>
-                <div className="dashboard-content-grid">
-                  <div className="dashboard-block">
-                    <div className="block-column">
-                      <p className="list-title">NOT CATERED NUMBERS</p>
-                      {waitingQueue.slice(0, 5).map((item) => (
-                        <p key={item.ticket_id} className="not-catered-number">
-                          {item.priority_number}
-                        </p>
-                      ))}
+              {/* Forward Modal (still needed for Ctr 1/2 with Help Desk/Inquiry tickets) */}
+              {showForwardModal && (
+                <div
+                  className="ticket-modal-overlay"
+                  onClick={() => {
+                    setShowForwardModal(false);
+                    setSelectedTargetCounter(null);
+                  }}
+                >
+                  <div
+                    className="ticket-modal"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="ticket-header">
+                      <h3>Select target counter</h3>
                     </div>
-                    <div className="block-column">
-                      <p className="actions-title">ACTIONS</p>
-                      {waitingQueue.slice(0, 5).map((item) => (
-                        <div
-                          key={item.ticket_id}
-                          className="waiting-actions-row"
-                        >
-                          <button
-                            className="cater-btn"
-                            onClick={() => handleCater(item)}
-                            disabled={currentTicket !== null || isProcessing}
-                            title={
-                              currentTicket
-                                ? `Complete ticket ${currentTicket.priority_number} first`
-                                : isProcessing
-                                  ? "Processing..."
+                    <div className="ticket-content">
+                      <div className="counter-selection-grid">
+                        {counters
+                          .filter(
+                            (counter) =>
+                              counter.is_active &&
+                              counter.id !== user?.counter_id,
+                          )
+                          .map((counter) => (
+                            <button
+                              key={counter.id}
+                              className={`service-btn ${
+                                selectedTargetCounter === counter.id
+                                  ? "active"
                                   : ""
-                            }
-                          >
-                            {isProcessing ? "Processing..." : `CATER`}
-                          </button>
-                          <button
-                            className="cancel-btn"
-                            onClick={() => handleCancelTicket(item)}
-                            disabled={isProcessing}
-                            title="Cancel this ticket"
-                          >
-                            X
-                          </button>
-                        </div>
-                      ))}
+                              }`}
+                              onClick={() =>
+                                setSelectedTargetCounter(counter.id)
+                              }
+                            >
+                              {counter.counter_name}
+                            </button>
+                          ))}
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="dashboard-block">
-                    <div className="block-column">
-                      <p className="list-title">SKIPPED NUMBERS</p>
-                      {skippedQueue.slice(0, 5).map((item) => (
-                        <p key={item.ticket_id} className="skipped-number">
-                          {item.priority_number}
-                        </p>
-                      ))}
-                    </div>
-                    <div className="block-column">
-                      <p className="actions-title">ACTIONS</p>
-                      {skippedQueue.slice(0, 5).map((item) => (
-                        <div
-                          key={item.ticket_id}
-                          className="skipped-actions-row"
-                        >
-                          <button
-                            className="cater-again-btn"
-                            onClick={() => handleCaterAgain(item)}
-                            disabled={currentTicket !== null || isProcessing}
-                          >
-                            {isProcessing ? "..." : "CATER AGAIN"}
-                          </button>
-                          <button
-                            className="cancel-btn"
-                            onClick={() => handleCancelTicket(item)}
-                            disabled={isProcessing}
-                            title="Cancel this ticket"
-                          >
-                            X
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                    <button
+                      className="close-modal-btn"
+                      onClick={handleForward}
+                      disabled={!selectedTargetCounter || isProcessing}
+                    >
+                      Forward
+                    </button>
                   </div>
                 </div>
-              </div>
-
-              <Analytics
-                servingQueue={servingQueue}
-                waitingQueue={waitingQueue}
-                skippedQueue={skippedQueue}
-              />
+              )}
             </div>
           ) : (
             <div className="admin-dashboard">
@@ -699,6 +1244,97 @@ function Dashboard() {
               </div>
 
               {/* Reports section below the main admin grid */}
+              <div className="reports-section">
+                <h3>Reports</h3>
+                <div className="report-period-buttons">
+                  {["daily", "weekly", "monthly", "yearly"].map((period) => (
+                    <button
+                      key={period}
+                      className={`report-period-btn ${reportPeriod === period ? "active" : ""}`}
+                      onClick={() => setReportPeriod(period)}
+                    >
+                      {period.charAt(0).toUpperCase() + period.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                {reports && (
+                  <div className="reports-content">
+                    <div className="report-stats">
+                      <div className="report-stat">
+                        <span className="stat-label">Total</span>
+                        <span className="stat-value">
+                          {reports.totalTickets}
+                        </span>
+                      </div>
+                      <div className="report-stat">
+                        <span className="stat-label">Served</span>
+                        <span className="stat-value">{reports.served}</span>
+                      </div>
+                      <div className="report-stat">
+                        <span className="stat-label">Skipped</span>
+                        <span className="stat-value">{reports.skipped}</span>
+                      </div>
+                      <div className="report-stat">
+                        <span className="stat-label">Cancelled</span>
+                        <span className="stat-value">{reports.cancelled}</span>
+                      </div>
+                    </div>
+                    {reports.serviceTypeCounts && (
+                      <div className="service-type-reports">
+                        <h4>Service Type Breakdown</h4>
+                        <div className="service-type-list">
+                          {Object.entries(reports.serviceTypeCounts).map(
+                            ([type, count]) => (
+                              <div key={type} className="service-type-stat">
+                                <span className="service-type-name">
+                                  {type}
+                                </span>
+                                <span className="service-type-count">
+                                  {count as number}
+                                </span>
+                              </div>
+                            ),
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {reports.counterBreakdown &&
+                      Object.keys(reports.counterBreakdown).length > 0 && (
+                        <div className="counter-breakdown-section">
+                          <h4>Counter Performance</h4>
+                          <div className="counter-breakdown-grid">
+                            {Object.entries(reports.counterBreakdown).map(
+                              ([counterId, data]: [string, any]) => (
+                                <div
+                                  key={counterId}
+                                  className="counter-breakdown-card"
+                                >
+                                  <span className="counter-label">
+                                    Counter {counterId}
+                                  </span>
+                                  <div className="counter-stats">
+                                    <div className="counter-stat-item">
+                                      <span className="stat-label">Total</span>
+                                      <span className="stat-value">
+                                        {data.total}
+                                      </span>
+                                    </div>
+                                    <div className="counter-stat-item">
+                                      <span className="stat-label">Served</span>
+                                      <span className="stat-value">
+                                        {data.served}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ),
+                            )}
+                          </div>
+                        </div>
+                      )}
+                  </div>
+                )}
+              </div>
               <Reports />
             </div>
           )}

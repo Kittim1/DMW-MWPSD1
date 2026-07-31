@@ -11,28 +11,30 @@
 
 .logs-header h3 {
   margin: 0;
-  color: #5a5c69;
+  color: var(--text-secondary);
   font-size: 1.25rem;
   font-weight: 700;
 }
 
 .live-badge {
-  background: #eef2ff;
-  color: #4e73df;
+  background: var(--bg-tertiary);
+  color: var(--primary-color);
   font-size: 0.65rem;
   font-weight: 800;
   padding: 4px 10px;
   border-radius: 12px;
   letter-spacing: 0.05rem;
+  transition: background-color 0.3s;
 }
 
 .logs-container {
-  background: white;
+  background: var(--bg-secondary);
   border-radius: 8px;
-  border: 1px solid #e3e6f0;
-  box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 0.15rem 1.75rem 0 rgba(0, 0, 0, 0.1);
   max-height: 600px;
   overflow-y: auto;
+  transition: background-color 0.3s, border-color 0.3s;
 }
 
 .logs-list {
@@ -44,12 +46,12 @@
   display: flex;
   gap: 15px;
   padding: 15px 20px;
-  border-bottom: 1px solid #f8f9fc;
-  transition: background 0.2s;
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.2s, border-color 0.3s;
 }
 
 .log-entry:hover {
-  background: #f8f9fc;
+  background: var(--bg-tertiary);
 }
 
 .log-entry:last-child {
@@ -63,8 +65,9 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  background: #f8f9fc;
+  background: var(--bg-tertiary);
   border-radius: 50%;
+  transition: background-color 0.3s;
 }
 
 .log-body {
@@ -75,7 +78,7 @@
   margin: 0 0 5px 0;
   font-size: 0.9rem;
   font-weight: 600;
-  color: #5a5c69;
+  color: var(--text-primary);
 }
 
 .log-meta {
@@ -83,7 +86,7 @@
   align-items: center;
   gap: 8px;
   font-size: 0.75rem;
-  color: #b7b9cc;
+  color: var(--text-muted);
 }
 
 .log-dot {
@@ -91,7 +94,7 @@
 }
 
 .log-entry.catered {
-  border-left: 4px solid #4e73df;
+  border-left: 4px solid var(--primary-color);
 }
 .log-entry.catered_again {
   border-left: 4px solid #36b9cc;
@@ -103,13 +106,13 @@
   border-left: 4px solid #f6c23e;
 }
 .log-entry.cancelled {
-  border-left: 4px solid #e74a3b;
+  border-left: 4px solid var(--danger-color);
 }
 
 .logs-loading,
 .logs-empty {
   padding: 60px;
   text-align: center;
-  color: #858796;
+  color: var(--text-muted);
   font-weight: 600;
 }

@@ -11,22 +11,24 @@
 }
 
 .settings-card {
-  background: white;
+  background: var(--bg-secondary);
   border-radius: 12px;
-  border: 1px solid #e3e6f0;
-  box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 0.15rem 1.75rem 0 rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  transition: background-color 0.3s, border-color 0.3s;
 }
 
 .settings-card .card-header {
   padding: 25px 30px;
-  background-color: #f8f9fc;
-  border-bottom: 1px solid #e3e6f0;
+  background-color: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.3s, border-color 0.3s;
 }
 
 .settings-card h3 {
   margin: 0;
-  color: #4e73df;
+  color: var(--primary-color);
   font-weight: 800;
   font-size: 1.1rem;
   text-transform: uppercase;
@@ -36,7 +38,63 @@
 .settings-card .card-header p {
   margin: 5px 0 0 0;
   font-size: 0.85rem;
-  color: #858796;
+  color: var(--text-muted);
+}
+
+.dark-mode-toggle {
+  padding: 20px 30px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.toggle-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.toggle-label span:first-child {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.toggle-label span:last-child {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.toggle-btn {
+  width: 60px;
+  height: 30px;
+  background: var(--border-color);
+  border-radius: 30px;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: background-color 0.3s;
+}
+
+.toggle-btn.active {
+  background: var(--primary-color);
+}
+
+.toggle-slider {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.3s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.toggle-btn.active .toggle-slider {
+  transform: translateX(30px);
 }
 
 .settings-form {
@@ -53,22 +111,23 @@
 .form-group label {
   font-size: 0.75rem;
   font-weight: 800;
-  color: #5a5c69;
+  color: var(--text-secondary);
   text-transform: uppercase;
 }
 
 .form-group input {
   padding: 12px 15px;
-  border: 1px solid #d1d3e2;
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   font-size: 0.9rem;
-  color: #6e707e;
-  transition: border-color 0.2s;
+  color: var(--text-primary);
+  background-color: var(--bg-tertiary);
+  transition: border-color 0.2s, background-color 0.3s;
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: #4e73df;
+  border-color: var(--primary-color);
   box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
 }
 
@@ -85,19 +144,20 @@
   left: 0;
   right: 0;
   height: 1px;
-  background: #eaecf4;
+  background: var(--border-color);
   z-index: 1;
 }
 
 .form-divider span {
   position: relative;
-  background: white;
+  background: var(--bg-secondary);
   padding: 0 15px;
   z-index: 2;
   font-size: 0.7rem;
   font-weight: 800;
-  color: #b7b9cc;
+  color: var(--text-muted);
   text-transform: uppercase;
+  transition: background-color 0.3s;
 }
 
 .form-row {
@@ -129,7 +189,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px 30px;
-  border-bottom: 1px solid #f8f9fc;
+  border-bottom: 1px solid var(--bg-tertiary);
 }
 
 .system-setting-item:last-child {
@@ -144,19 +204,19 @@
 
 .setting-title {
   font-weight: 700;
-  color: #5a5c69;
+  color: var(--text-secondary);
   font-size: 0.95rem;
 }
 
 .setting-desc {
   font-size: 0.8rem;
-  color: #b7b9cc;
+  color: var(--text-muted);
 }
 
 .btn-outline {
   background: transparent;
-  border: 1px solid #d1d3e2;
-  color: #858796;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
 }
 
 @media (max-width: 576px) {

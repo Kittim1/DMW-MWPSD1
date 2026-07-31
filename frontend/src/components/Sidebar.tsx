@@ -27,6 +27,13 @@ function Sidebar({ role, onLogout, activeView, setActiveView }: SidebarProps) {
         {role === "superadmin" && (
           <>
             <button
+              className={`nav-item ${activeView === "services" ? "active" : ""}`}
+              onClick={() => setActiveView("services")}
+            >
+              <span className="nav-icon">🛠️</span>
+              <span className="nav-text">Services</span>
+            </button>
+            <button
               className={`nav-item ${activeView === "reports" ? "active" : ""}`}
               onClick={() => setActiveView("reports")}
             >

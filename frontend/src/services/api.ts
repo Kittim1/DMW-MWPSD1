@@ -1,7 +1,11 @@
 import axios from "axios";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+  import.meta.env.VITE_API_URL ||
+  (window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1"
+    ? "http://localhost:8000/api"
+    : `${window.location.origin}/api`);
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -49,23 +53,38 @@ export const queueService = {
     apiClient.post(`/queue/call-next/${counterId}`),
   completeService: (ticketId: number) =>
     apiClient.post(`/queue/complete/${ticketId}`),
-  skipTicket: (ticketId: number) =>
-    apiClient.post(`/queue/skip/${ticketId}`),
+  skipTicket: (ticketId: number) => apiClient.post(`/queue/skip/${ticketId}`),
   cancelTicket: (ticketId: number) =>
     apiClient.post(`/queue/cancel/${ticketId}`),
   caterTicket: (ticketId: number, counterId: number) =>
     apiClient.post(`/queue/cater/${ticketId}/${counterId}`),
   resetQueue: () => apiClient.post("/queue/reset"),
-  getReports: (type: string) => apiClient.get(`/queue/reports?type=${type}`),
+  forwardTicket: (ticketId: number, targetCounterId: number) =>
+    apiClient.post(`/queue/forward/${ticketId}`, { target_counter_id: targetCounterId }),
+  getReports: (type: string, counterId?: number) => {
+    let url = `/queue/reports?type=${type}`;
+    if (counterId) {
+      url += `&counter_id=${counterId}`;
+    }
+    return apiClient.get(url);
+  },
   getLogs: () => apiClient.get("/queue/logs"),
   getTickets: () => apiClient.get("/queue/tickets"),
-  addTicket: (data: any) => apiClient.post("/queue/tickets", data),
+  addTicket: (data: any) =>
+    apiClient.post("/queue/tickets", data),
 };
 
 export const counterService = {
   getCounters: () => apiClient.get("/counters"),
   updateCounter: (id: number, data: any) =>
     apiClient.put(`/counters/${id}`, data),
+};
+
+export const serviceService = {
+  getServices: () => apiClient.get("/services"),
+  addService: (name: string) => apiClient.post("/services", { name }),
+  updateService: (id: number, name: string) => apiClient.put(`/services/${id}`, { name }),
+  deleteService: (id: number) => apiClient.delete(`/services/${id}`),
 };
 
 export default apiClient;

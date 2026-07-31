@@ -1,0 +1,923 @@
+/* =====================================================================
+   GUARD DASHBOARD — Guard-specific styles
+   Reuses existing .counter-mockup-dashboard classes from Dashboard.css
+   (header, sidebar, mockup-* classes) and adds Guard-only extras.
+   ===================================================================== */
+
+.guard-layout {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ------ MAIN (right side): sidebar sibling, single card, scroll ONLY here ------ */
+.guard-main {
+  position: relative;
+  /* Project rule: only inner specific area scrolls. Header + sidebar stay locked. */
+  overflow-y: auto;
+  overflow-x: hidden;
+  isolation: isolate;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 10px 22px 22px 8px;
+  min-height: 0; /* CRITICAL — flex parent constraint for nested scroll */
+  display: flex; /* explicit flex so padding centers work */
+  flex-direction: column;
+  flex: 1 1 auto;
+}
+
+/* Watermark — fixed behind scrollable card (stays put while scrolling) */
+.guard-watermark {
+  left: 52% !important;
+  top: 50% !important;
+  width: 78% !important;
+  max-width: none !important;
+  z-index: 0;
+  opacity: 0.28 !important;
+  position: absolute !important;
+  transform: translate(-50%, -50%) !important;
+  pointer-events: none;
+}
+
+/* ================================================================
+   SERVICES CARD — white rounded card
+   ================================================================ */
+.guard-services-card {
+  position: relative;
+  z-index: 1;
+  margin: 8px auto auto auto; /* top 8px small space, then auto for centering */
+  background: #fff;
+  border: 3px solid #333;
+  border-radius: 26px;
+  padding: 26px 40px 28px 40px;
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.6),
+    0 4px 14px rgba(0, 0, 0, 0.14);
+  box-sizing: border-box;
+  max-width: 1020px;
+  width: 100%;
+  /* Natural content height; if taller than viewport guard-main scrolls it */
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex-shrink: 0;
+}
+
+.guard-services-title {
+  margin: 0;
+  text-align: center;
+  font-size: 1.55rem;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  color: #0a1a34;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+/* ================================================================
+   TILE GRID: 3 cols × 2 rows
+   ================================================================ */
+.guard-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(130px, auto));
+  gap: 22px 24px;
+  flex-shrink: 0;
+}
+
+.guard-tile {
+  position: relative;
+  min-height: 130px;
+  border: 3px solid #7d6608;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fff79b 0%, #ffe94a 50%, #f5d60e 100%);
+  color: #000;
+  cursor: pointer;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 14px 16px;
+  box-sizing: border-box;
+  transition:
+    transform 0.05s ease,
+    box-shadow 0.12s ease,
+    filter 0.1s ease;
+  box-shadow:
+    inset 3px 3px 0 rgba(255, 255, 255, 0.55),
+    inset -3px -3px 0 rgba(125, 102, 8, 0.55),
+    0 3px 6px rgba(125, 102, 8, 0.28);
+  user-select: none;
+}
+
+.guard-tile:hover {
+  filter: brightness(1.04);
+}
+
+.guard-tile:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset -2px -2px 0 rgba(255, 255, 255, 0.55),
+    inset 3px 3px 0 rgba(125, 102, 8, 0.45),
+    0 1px 2px rgba(125, 102, 8, 0.2);
+}
+
+.guard-tile-label {
+  font-size: 1.3rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 1.1;
+  word-break: keep-all;
+  white-space: pre-line;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+/* Selected (pressed) sunken state */
+.guard-tile.pressed {
+  background: linear-gradient(180deg, #f0dc26 0%, #e2c606 55%, #c9ad00 100%);
+  box-shadow:
+    inset 4px 4px 8px rgba(125, 102, 8, 0.5),
+    inset -2px -2px 0 rgba(255, 255, 255, 0.45),
+    0 1px 2px rgba(0, 0, 0, 0.08);
+  border-color: #5c4d00;
+}
+
+.guard-tile-check {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: #1e8449;
+  color: #fff;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 17px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+/* Empty sixth tile: completely invisible */
+.guard-tile-empty {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  cursor: default;
+  pointer-events: none;
+  visibility: hidden;
+}
+.guard-tile-empty:hover,
+.guard-tile-empty:active {
+  filter: none;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ================================================================
+   SELECTED SERVICES PILLS ROW (between tiles + generate)
+   ================================================================ */
+.guard-selected-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(10, 26, 52, 0.05);
+  border: 1px dashed rgba(10, 26, 52, 0.22);
+  border-radius: 10px;
+  min-height: 24px;
+  flex-shrink: 0;
+}
+
+.guard-selected-label {
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: #0a1a34;
+}
+
+.guard-selected-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.guard-selected-pill {
+  background: #0a4b8c;
+  color: #fff;
+  padding: 4px 9px 4px 11px;
+  border-radius: 14px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 1px 2px rgba(10, 75, 140, 0.25);
+}
+
+.guard-pill-close {
+  background: rgba(255, 255, 255, 0.18);
+  border: none;
+  color: #fff;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-weight: 900;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  transition: background 0.12s;
+}
+.guard-pill-close:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* ================================================================
+   GENERATE TICKET CTA
+   ================================================================ */
+.guard-generate-row {
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.guard-generate-btn {
+  min-width: 360px;
+  min-height: 62px;
+  font-size: 1.15rem !important;
+  letter-spacing: 1.1px;
+  font-weight: 900 !important;
+}
+.guard-generate-btn:disabled {
+  background: #8ca2bf !important;
+  border-color: #5c7698 !important;
+  filter: grayscale(0.25);
+  cursor: not-allowed !important;
+}
+
+/* Guard-specific: slightly tighten header (keep 100vh lock visually pleasing) */
+.guard-layout .mockup-header {
+  padding-top: 6px !important;
+  padding-bottom: 10px !important;
+  flex-shrink: 0;
+}
+
+/* ================================================================
+   MODAL OVERLAY + CARD (common for all modals)
+   ================================================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 14, 30, 0.55);
+  display: grid;
+  place-items: center;
+  z-index: 2000;
+  padding: 20px;
+  box-sizing: border-box;
+  animation: fadeIn 0.12s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-card {
+  background: #fff;
+  border: 3px solid #0a1a34;
+  border-radius: 18px;
+  padding: 26px 32px 28px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.6),
+    0 12px 30px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: popIn 0.14s ease-out;
+}
+
+.modal-card-small {
+  max-width: 440px;
+  text-align: center;
+}
+
+@keyframes popIn {
+  from {
+    transform: translateY(8px) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.modal-title {
+  margin: 0;
+  text-align: center;
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+  color: #0a1a34;
+  text-transform: uppercase;
+}
+
+.modal-title-accent {
+  color: #0a4b8c;
+  padding-bottom: 6px;
+  border-bottom: 2px dashed rgba(10, 75, 140, 0.25);
+}
+
+.modal-question {
+  margin: 4px 0 0 0;
+  text-align: center;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0a4b8c;
+  line-height: 1.2;
+}
+
+.modal-subtitle {
+  margin: 0;
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #0a1a34;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+/* ================================================================
+   BEVEL BUTTON BASE (Win 98 style, used in modals + tiles)
+   ================================================================ */
+.btn-bevel {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 60px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  color: #fff;
+  border-style: solid;
+  border-width: 3px;
+  transition:
+    transform 0.05s,
+    box-shadow 0.1s,
+    filter 0.1s;
+  user-select: none;
+}
+.btn-bevel:hover {
+  filter: brightness(1.05);
+}
+.btn-bevel:active {
+  transform: translateY(2px);
+}
+
+/* Navy (YES) */
+.btn-bevel.btn-navy {
+  background: linear-gradient(180deg, #1a5bbb 0%, #0a4b8c 55%, #06336b 100%);
+  border-color: #0a1a34;
+  border-top-color: #3a7de0;
+  border-left-color: #3a7de0;
+  border-right-color: #06336b;
+  border-bottom-color: #052550;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.3),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.3),
+    0 2px 5px rgba(0, 0, 0, 0.25);
+  color: #fff;
+}
+.btn-bevel.btn-navy:active {
+  border-top-color: #06336b;
+  border-left-color: #06336b;
+  border-right-color: #3a7de0;
+  border-bottom-color: #3a7de0;
+  box-shadow:
+    inset -1px -1px 0 rgba(255, 255, 255, 0.2),
+    inset 2px 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+/* Red (NO) */
+.btn-bevel.btn-red {
+  background: linear-gradient(180deg, #ef5350 0%, #d32f2f 55%, #a81f1f 100%);
+  border-color: #5c1515;
+  border-top-color: #ff8a80;
+  border-left-color: #ff8a80;
+  border-right-color: #a81f1f;
+  border-bottom-color: #7a1212;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.28),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.3),
+    0 2px 5px rgba(138, 23, 23, 0.25);
+  color: #fff;
+}
+.btn-bevel.btn-red:active {
+  border-top-color: #a81f1f;
+  border-left-color: #a81f1f;
+  border-right-color: #ff8a80;
+  border-bottom-color: #ff8a80;
+  box-shadow:
+    inset -1px -1px 0 rgba(255, 255, 255, 0.2),
+    inset 2px 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+/* Blue (select options: INQUIRY / APPOINTMENT / G2G buttons + HD options) */
+.btn-bevel.btn-blue {
+  background: linear-gradient(180deg, #4a9af5 0%, #2a7ed1 55%, #1960a6 100%);
+  border-color: #0a1a34;
+  border-top-color: #7fb6ff;
+  border-left-color: #7fb6ff;
+  border-right-color: #1960a6;
+  border-bottom-color: #0d4787;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.35),
+    inset -2px -2px 0 rgba(10, 75, 140, 0.4),
+    0 2px 5px rgba(10, 75, 140, 0.25);
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+}
+.btn-bevel.btn-blue:active,
+.btn-bevel.btn-blue.sunken {
+  background: linear-gradient(180deg, #2a7ed1 0%, #1960a6 55%, #0d4787 100%);
+  border-top-color: #0d4787;
+  border-left-color: #0d4787;
+  border-right-color: #7fb6ff;
+  border-bottom-color: #7fb6ff;
+  box-shadow:
+    inset 2px 2px 5px rgba(10, 75, 140, 0.5),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* Gray (back button) */
+.btn-bevel.btn-gray {
+  background: linear-gradient(180deg, #bdc9d6 0%, #8da2bd 55%, #6f88a9 100%);
+  border-color: #3f5570;
+  border-top-color: #d8e2ef;
+  border-left-color: #d8e2ef;
+  border-right-color: #5c7698;
+  border-bottom-color: #3f5570;
+  color: #0a1a34;
+  min-height: 44px;
+  font-size: 0.95rem;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.5),
+    inset -2px -2px 0 rgba(60, 75, 100, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.15);
+}
+.btn-bevel.btn-gray:active {
+  border-top-color: #5c7698;
+  border-left-color: #5c7698;
+  border-right-color: #d8e2ef;
+  border-bottom-color: #d8e2ef;
+}
+
+.btn-wide {
+  width: 100%;
+}
+
+/* ================================================================
+   YES / NO centered row
+   ================================================================ */
+.modal-yn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 6px;
+}
+
+/* ================================================================
+   BLUE OPTIONS STACKED COLUMN (Direct Hire select / G2G)
+   ================================================================ */
+.modal-blue-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 6px;
+  width: 90%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ================================================================
+   BACK BUTTON row
+   ================================================================ */
+.modal-back-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 8px;
+}
+
+/* ================================================================
+   HELP DESK option grid (2×2)
+   ================================================================ */
+.hd-option-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 18px 20px;
+  margin-top: 4px;
+}
+
+.hd-opt-check {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  font-size: 1.25rem;
+  color: #fff;
+  font-weight: 900;
+  opacity: 0.95;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+}
+
+/* ================================================================
+   MODAL DONE (green CTA row
+   ================================================================ */
+.modal-done-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.modal-primary-btn {
+  min-width: 260px;
+  min-height: 58px;
+  font-size: 1.2rem !important;
+  font-weight: 900 !important;
+  letter-spacing: 1px;
+}
+.modal-primary-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: #7f9a88 !important;
+  border-color: #4e6c59 !important;
+}
+
+/* ================================================================
+   TICKET SUCCESS MODAL
+   ================================================================ */
+.ticket-success-number {
+  text-align: center;
+  font-size: 4.6rem;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: #0a1a34;
+  padding: 10px 4px;
+  background: rgba(10, 75, 140, 0.07);
+  border: 2px dashed rgba(10, 75, 140, 0.35);
+  border-radius: 12px;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.8);
+}
+.ticket-success-services {
+  text-align: center;
+  font-size: 1.1rem;
+  color: #0a4b8c;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+/* ================================================================
+   ENTER YOUR NAME modal step (Direct Hire NO-path final step)
+   ================================================================ */
+.modal-name-title {
+  margin: 6px 0 0 0;
+  text-align: center;
+  font-size: 1.6rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #0a4b8c;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+}
+
+.modal-name-input {
+  width: 100%;
+  min-height: 64px;
+  padding: 12px 18px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0a1a34;
+  background: #fff;
+  border: 3px solid #0a1a34;
+  border-radius: 12px;
+  box-sizing: border-box;
+  outline: none;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+  box-shadow:
+    inset 2px 2px 4px rgba(10, 26, 52, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.6);
+}
+.modal-name-input::placeholder {
+  color: rgba(10, 26, 52, 0.35);
+  font-weight: 600;
+}
+.modal-name-input:focus {
+  border-color: #0a4b8c;
+  box-shadow:
+    inset 2px 2px 4px rgba(10, 75, 140, 0.18),
+    0 0 0 3px rgba(10, 75, 140, 0.12);
+}
+
+/* ================================================================
+   TICKET SUCCESS: extra info rows (client, details, counter)
+   ================================================================ */
+.ticket-info-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  background: rgba(10, 26, 52, 0.04);
+  border: 1px solid rgba(10, 26, 52, 0.15);
+  border-radius: 10px;
+}
+.ticket-info-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #5c7698;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+.ticket-info-value {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #0a1a34;
+  word-break: break-word;
+  line-height: 1.2;
+}
+
+.ticket-counter-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: rgba(30, 132, 73, 0.08);
+  border: 2px dashed rgba(30, 132, 73, 0.4);
+  border-radius: 12px;
+}
+.ticket-counter-heading {
+  margin: 0;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #1e8449;
+  text-transform: uppercase;
+}
+.ticket-counter-chip {
+  text-align: center;
+  font-size: 1.02rem;
+  font-weight: 900;
+  color: #fff;
+  background: linear-gradient(180deg, #28b463 0%, #1e8449 60%, #186a3b 100%);
+  border: 3px solid #0e3f20;
+  border-top-color: #82e0aa;
+  border-left-color: #82e0aa;
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.3),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.25),
+    0 2px 6px rgba(30, 132, 73, 0.3);
+}
+
+/* ================================================================
+   PRIORITY: checkbox row at top-left of services card
+   ================================================================ */
+.guard-card-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-shrink: 0;
+  margin-bottom: -4px;
+}
+
+.guard-priority-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 4px;
+  flex-wrap: wrap;
+}
+
+.guard-priority-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.guard-priority-checkmark {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 3px solid #0a1a34;
+  border-radius: 8px;
+  background: #fff;
+  flex-shrink: 0;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    transform 0.05s ease;
+  box-shadow:
+    inset 2px 2px 0 rgba(0, 0, 0, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.7);
+  font-weight: 900;
+  font-size: 1.1rem;
+  color: #fff;
+}
+.guard-priority-checkmark.checked {
+  background: linear-gradient(180deg, #f1948a 0%, #e74c3c 55%, #b03a2e 100%);
+  border-color: #7b241c;
+  border-top-color: #f5b7b1;
+  border-left-color: #f5b7b1;
+  box-shadow:
+    inset -1px -1px 0 rgba(255, 255, 255, 0.25),
+    inset 2px 2px 4px rgba(123, 36, 28, 0.4),
+    0 1px 3px rgba(192, 57, 43, 0.3);
+}
+
+.guard-priority-label {
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  color: #0a1a34;
+  text-transform: uppercase;
+}
+
+.guard-priority-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 14px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  color: #fff;
+  background: linear-gradient(180deg, #f1948a 0%, #e74c3c 55%, #b03a2e 100%);
+  border: 2px solid #7b241c;
+  box-shadow: 0 1px 3px rgba(192, 57, 43, 0.3);
+}
+
+/* ================================================================
+   PRIORITY: modal option buttons (SELECT ONE)
+   ================================================================ */
+.priority-option-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 8px;
+  width: 92%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.priority-option-btn {
+  min-height: 72px !important;
+  font-size: 1.28rem !important;
+  line-height: 1.15 !important;
+  padding: 12px 22px !important;
+}
+
+.priority-opt-check {
+  position: absolute;
+  top: 14px;
+  right: 20px;
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #fff;
+  opacity: 0.98;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+}
+
+/* ================================================================
+   PRIORITY: success ticket modal red banner
+   ================================================================ */
+.ticket-priority-banner {
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  color: #fff;
+  text-transform: uppercase;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #f1948a 0%, #e74c3c 55%, #b03a2e 100%);
+  border: 3px solid #7b241c;
+  border-top-color: #f5b7b1;
+  border-left-color: #f5b7b1;
+  border-radius: 10px;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.3),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.25),
+    0 2px 6px rgba(192, 57, 43, 0.35);
+  margin-top: 2px;
+}
+
+/* ================================================================
+   RESPONSIVE TWEAKS (tablet + small screens)
+   ================================================================ */
+@media (max-width: 1100px) {
+  .guard-tile-label {
+    font-size: 1.15rem;
+  }
+  .guard-tile {
+    min-height: 120px;
+  }
+  .guard-tile-grid {
+    grid-template-rows: repeat(2, minmax(120px, auto));
+    gap: 18px 20px;
+  }
+  .guard-generate-btn {
+    min-width: 300px;
+  }
+  .guard-services-card {
+    padding: 22px 32px;
+  }
+}
+
+@media (max-width: 860px) {
+  .guard-tile-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(3, minmax(115px, auto));
+    gap: 16px;
+  }
+  .guard-tile-empty {
+    display: none;
+    visibility: visible;
+  }
+  .modal-yn-row {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .guard-services-card {
+    padding: 18px;
+    gap: 16px;
+  }
+  .guard-services-title {
+    font-size: 1.2rem;
+  }
+  .ticket-success-number {
+    font-size: 3.4rem;
+  }
+  .guard-tile-label {
+    font-size: 1.05rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .guard-services-card {
+    padding: 14px;
+    border-radius: 18px;
+  }
+  .guard-tile-label {
+    font-size: 1rem;
+  }
+  .guard-tile {
+    min-height: 110px;
+    padding: 10px 12px;
+  }
+  .guard-tile-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(3, minmax(110px, auto));
+    gap: 12px;
+  }
+  .guard-generate-btn {
+    min-width: 100%;
+  }
+  .hd-option-grid {
+    grid-template-columns: 1fr;
+  }
+  .guard-main {
+    padding: 6px 10px 14px 4px;
+  }
+}

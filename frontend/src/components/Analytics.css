@@ -6,24 +6,26 @@
 }
 
 .admin-analytics-card {
-  background: white;
+  background: var(--bg-secondary);
   border-radius: 8px;
-  box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
-  border: 1px solid #e3e6f0;
+  box-shadow: 0 0.15rem 1.75rem 0 rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: background-color 0.3s, border-color 0.3s;
 }
 
 .admin-analytics-card .card-header {
-  background-color: #f8f9fc;
-  border-bottom: 1px solid #e3e6f0;
+  background-color: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
   padding: 15px 20px;
+  transition: background-color 0.3s, border-color 0.3s;
 }
 
 .admin-analytics-card h4 {
   margin: 0;
-  color: #4e73df;
+  color: var(--primary-color);
   font-weight: bold;
   text-transform: uppercase;
   font-size: 0.8rem;
@@ -67,13 +69,13 @@
 .total-val {
   font-size: 1.5rem;
   font-weight: 800;
-  color: #5a5c69;
+  color: var(--text-secondary);
   line-height: 1;
 }
 
 .total-lbl {
   font-size: 0.7rem;
-  color: #b7b9cc;
+  color: var(--text-muted);
   text-transform: uppercase;
   font-weight: 700;
 }
@@ -99,17 +101,17 @@
 }
 
 .legend-row .lbl {
-  color: #858796;
+  color: var(--text-muted);
   flex: 1;
 }
 
 .legend-row .val {
   font-weight: 700;
-  color: #5a5c69;
+  color: var(--text-secondary);
 }
 
 .legend-row .pct {
-  color: #b7b9cc;
+  color: var(--text-muted);
   font-size: 0.75rem;
   width: 45px;
   text-align: right;
@@ -148,14 +150,14 @@
 
 .bar-fill {
   width: 24px;
-  background-color: #4e73df;
+  background-color: var(--primary-color);
   border-radius: 4px 4px 0 0;
   position: relative;
   transition: all 0.3s ease;
 }
 
 .bar-fill:hover {
-  background-color: #2e59d9;
+  background-color: var(--primary-hover);
 }
 
 .bar-tooltip {
@@ -163,7 +165,7 @@
   top: -25px;
   left: 50%;
   transform: translateX(-50%);
-  background: #5a5c69;
+  background: var(--text-secondary);
   color: white;
   padding: 2px 6px;
   border-radius: 4px;
@@ -181,7 +183,7 @@
 .bar-axis-label {
   margin-top: 10px;
   font-size: 0.7rem;
-  color: #b7b9cc;
+  color: var(--text-muted);
   font-weight: 700;
   text-transform: uppercase;
 }
